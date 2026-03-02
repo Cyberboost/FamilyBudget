@@ -1,0 +1,270 @@
+// Prisma schema for FamilyBudget
+// Every data row is scoped to familyId (multi-tenant)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------------------
+// Enums
+// ------------------------------------------------------------------
+
+enum Role {
+  PARENT_ADMIN
+  PARENT
+  TEEN
+  KID
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum AuditAction {
+  FAMILY_CREATED
+  MEMBER_INVITED
+  INVITE_ACCEPTED
+  INVITE_REVOKED
+  ROLE_CHANGED
+  BANK_CONNECTED
+  BANK_DISCONNECTED
+  TRANSACTION_SYNCED
+  CATEGORY_OVERRIDDEN
+  MERCHANT_RULE_CREATED
+  MERCHANT_RULE_DELETED
+  BUDGET_CREATED
+  BUDGET_UPDATED
+  BUDGET_DELETED
+  GOAL_CREATED
+  GOAL_UPDATED
+  GOAL_DELETED
+  GOAL_SHARE_CHANGED
+  MEMBER_REMOVED
+}
+
+// ------------------------------------------------------------------
+// Family & Members
+// ------------------------------------------------------------------
+
+model Family {
+  id          String   @id @default(cuid())
+  name        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     FamilyMember[]
+  invites     Invite[]
+  plaidItems  PlaidItem[]
+  accounts    Account[]
+  transactions Transaction[]
+  budgets     Budget[]
+  goals       Goal[]
+  merchantRules MerchantRule[]
+  auditLogs   AuditLog[]
+}
+
+model FamilyMember {
+  id        String   @id @default(cuid())
+  familyId  String
+  clerkId   String   // Clerk user ID
+  email     String
+  name      String?
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  family    Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, clerkId])
+  @@index([clerkId])
+}
+
+model Invite {
+  id         String       @id @default(cuid())
+  familyId   String
+  email      String
+  role       Role
+  token      String       @unique @default(cuid())
+  status     InviteStatus @default(PENDING)
+  invitedBy  String       // clerkId of inviter
+  expiresAt  DateTime
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  family     Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([email])
+}
+
+// ------------------------------------------------------------------
+// Plaid
+// ------------------------------------------------------------------
+
+model PlaidItem {
+  id                  String   @id @default(cuid())
+  familyId            String
+  plaidItemId         String   @unique  // Plaid item_id
+  encryptedAccessToken String          // AES-256-GCM encrypted
+  institutionId       String?
+  institutionName     String?
+  consentExpiresAt    DateTime?
+  cursor              String?          // transactions sync cursor
+  lastSyncedAt        DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  family              Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  accounts            Account[]
+
+  @@index([familyId])
+}
+
+model Account {
+  id            String   @id @default(cuid())
+  familyId      String
+  plaidItemId   String
+  plaidAccountId String  @unique   // Plaid account_id
+  name          String
+  officialName  String?
+  type          String             // depository, credit, investment, etc.
+  subtype       String?
+  mask          String?            // last 4 digits
+  currentBalance Decimal?         @db.Decimal(18, 2)
+  availableBalance Decimal?       @db.Decimal(18, 2)
+  isoCurrencyCode String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  family        Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  plaidItem     PlaidItem @relation(fields: [plaidItemId], references: [id], onDelete: Cascade)
+  transactions  Transaction[]
+
+  @@index([familyId])
+}
+
+// ------------------------------------------------------------------
+// Transactions
+// ------------------------------------------------------------------
+
+model Transaction {
+  id                  String   @id @default(cuid())
+  familyId            String
+  accountId           String
+  plaidTransactionId  String   @unique
+  amount              Decimal  @db.Decimal(18, 2)   // positive = debit
+  isoCurrencyCode     String?
+  date                DateTime @db.Date
+  name                String                         // merchant/description
+  merchantName        String?
+  category            String?                        // user-visible category
+  plaidCategory       String?                        // raw Plaid category
+  pending             Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  family              Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  account             Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([familyId, date])
+  @@index([familyId, category])
+}
+
+// ------------------------------------------------------------------
+// Merchant → Category rules
+// ------------------------------------------------------------------
+
+model MerchantRule {
+  id           String   @id @default(cuid())
+  familyId     String
+  merchantName String   // pattern to match (case-insensitive contains)
+  category     String
+  createdBy    String   // clerkId
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  family       Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+}
+
+// ------------------------------------------------------------------
+// Budgets
+// ------------------------------------------------------------------
+
+model Budget {
+  id        String   @id @default(cuid())
+  familyId  String
+  month     Int      // 1-12
+  year      Int
+  category  String
+  limitAmount Decimal @db.Decimal(18, 2)
+  createdBy String   // clerkId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  family    Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, year, month, category])
+  @@index([familyId, year, month])
+}
+
+// ------------------------------------------------------------------
+// Goals
+// ------------------------------------------------------------------
+
+model Goal {
+  id           String   @id @default(cuid())
+  familyId     String
+  name         String
+  description  String?
+  targetAmount Decimal  @db.Decimal(18, 2)
+  savedAmount  Decimal  @default(0) @db.Decimal(18, 2)
+  targetDate   DateTime?
+  isCompleted  Boolean  @default(false)
+  createdBy    String   // clerkId (parent)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  family       Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  shares       GoalShare[]
+
+  @@index([familyId])
+}
+
+model GoalShare {
+  id        String   @id @default(cuid())
+  goalId    String
+  clerkId   String   // child member who can see this goal
+  createdAt DateTime @default(now())
+
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@unique([goalId, clerkId])
+}
+
+// ------------------------------------------------------------------
+// Audit Log
+// ------------------------------------------------------------------
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  familyId  String
+  actorId   String      // clerkId of actor (or "system")
+  action    AuditAction
+  targetId  String?     // ID of affected resource
+  metadata  Json?       // additional context
+  createdAt DateTime    @default(now())
+
+  family    Family      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId, createdAt])
+  @@index([actorId])
+}

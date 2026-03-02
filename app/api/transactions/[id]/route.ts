@@ -13,20 +13,21 @@ const bodySchema = z.object({ category: z.string().min(1).max(100) });
 
 export const PATCH = withErrorHandler(
   async (req: Request, ctx: unknown) => {
-    const { params } = ctx as { params: { id: string } };
+    const { params } = ctx as { params: Promise<{ id: string }> };
+    const { id } = await params;
     const actor = await requireAnyFamilyMember();
     if (actor.role === Role.KID || actor.role === Role.TEEN) {
       throw new ApiError(403, "Requires PARENT role or above");
     }
 
-    const tx = await prisma.transaction.findUnique({ where: { id: params.id } });
+    const tx = await prisma.transaction.findUnique({ where: { id } });
     if (!tx || tx.familyId !== actor.familyId) {
       throw new ApiError(404, "Transaction not found");
     }
 
     const body = bodySchema.parse(await (req as NextRequest).json());
     const updated = await prisma.transaction.update({
-      where: { id: params.id },
+      where: { id },
       data: { category: body.category },
     });
 
@@ -34,7 +35,7 @@ export const PATCH = withErrorHandler(
       familyId: actor.familyId,
       actorId: actor.clerkId,
       action: AuditAction.CATEGORY_OVERRIDDEN,
-      targetId: params.id,
+      targetId: id,
       metadata: { oldCategory: tx.category, newCategory: body.category },
     });
 

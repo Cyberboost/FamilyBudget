@@ -6,7 +6,7 @@ import Link from "next/link";
 export default async function TransactionsPage({
   searchParams,
 }: {
-  searchParams: { page?: string; search?: string; category?: string };
+  searchParams: Promise<{ page?: string; search?: string; category?: string }>;
 }) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
@@ -15,10 +15,9 @@ export default async function TransactionsPage({
   if (!member) redirect("/dashboard");
   if (member.role === "KID") redirect("/kids");
 
-  const page = Math.max(1, parseInt(searchParams.page ?? "1"));
+  const { page: pageParam, search, category } = await searchParams;
+  const page = Math.max(1, parseInt(pageParam ?? "1"));
   const pageSize = 50;
-  const search = searchParams.search;
-  const category = searchParams.category;
 
   const where: Record<string, unknown> = { familyId: member.familyId };
   if (search) {

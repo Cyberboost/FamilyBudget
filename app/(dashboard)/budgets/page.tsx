@@ -6,7 +6,7 @@ import { startOfMonth, endOfMonth } from "date-fns";
 export default async function BudgetsPage({
   searchParams,
 }: {
-  searchParams: { year?: string; month?: string };
+  searchParams: Promise<{ year?: string; month?: string }>;
 }) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
@@ -15,9 +15,10 @@ export default async function BudgetsPage({
   if (!member) redirect("/dashboard");
   if (member.role === "KID") redirect("/kids");
 
+  const { year: yearParam, month: monthParam } = await searchParams;
   const now = new Date();
-  const year = parseInt(searchParams.year ?? String(now.getFullYear()));
-  const month = parseInt(searchParams.month ?? String(now.getMonth() + 1));
+  const year = parseInt(yearParam ?? String(now.getFullYear()));
+  const month = parseInt(monthParam ?? String(now.getMonth() + 1));
 
   const monthStart = startOfMonth(new Date(year, month - 1));
   const monthEnd = endOfMonth(new Date(year, month - 1));

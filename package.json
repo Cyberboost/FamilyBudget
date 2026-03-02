@@ -17,7 +17,7 @@
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.3",
     "date-fns": "^4.1.0",
-    "next": "14.2.35",
+    "next": "^15.5.12",
     "node-jose": "^2.2.0",
     "pg": "^8.19.0",
     "plaid": "^41.3.0",

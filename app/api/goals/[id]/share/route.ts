@@ -20,12 +20,13 @@ const bodySchema = z.object({
 
 export const PUT = withErrorHandler(
   async (req: Request, ctx: unknown) => {
-    const { params } = ctx as { params: { id: string } };
+    const { params } = ctx as { params: Promise<{ id: string }> };
+    const { id } = await params;
     const actor = await requireAnyFamilyMember();
     await requireRole(actor.familyId, Role.PARENT);
 
     const goal = await prisma.goal.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { shares: true },
     });
     if (!goal || goal.familyId !== actor.familyId) {
@@ -46,12 +47,12 @@ export const PUT = withErrorHandler(
 
     // Replace shares
     await prisma.$transaction([
-      prisma.goalShare.deleteMany({ where: { goalId: params.id } }),
+      prisma.goalShare.deleteMany({ where: { goalId: id } }),
       ...(body.sharedWith.length > 0
         ? [
             prisma.goalShare.createMany({
               data: body.sharedWith.map((clerkId) => ({
-                goalId: params.id,
+                goalId: id,
                 clerkId,
               })),
             }),
@@ -63,10 +64,10 @@ export const PUT = withErrorHandler(
       familyId: actor.familyId,
       actorId: actor.clerkId,
       action: AuditAction.GOAL_SHARE_CHANGED,
-      targetId: params.id,
+      targetId: id,
       metadata: { sharedWith: body.sharedWith },
     });
 
-    return Response.json({ goalId: params.id, sharedWith: body.sharedWith });
+    return Response.json({ goalId: id, sharedWith: body.sharedWith });
   }
 );

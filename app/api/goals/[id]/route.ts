@@ -25,18 +25,19 @@ const updateSchema = z.object({
 
 export const PATCH = withErrorHandler(
   async (req: Request, ctx: unknown) => {
-    const { params } = ctx as { params: { id: string } };
+    const { params } = ctx as { params: Promise<{ id: string }> };
+    const { id } = await params;
     const actor = await requireAnyFamilyMember();
     await requireRole(actor.familyId, Role.PARENT);
 
-    const goal = await prisma.goal.findUnique({ where: { id: params.id } });
+    const goal = await prisma.goal.findUnique({ where: { id } });
     if (!goal || goal.familyId !== actor.familyId) {
       throw new ApiError(404, "Goal not found");
     }
 
     const body = updateSchema.parse(await (req as NextRequest).json());
     const updated = await prisma.goal.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...body,
         targetDate: body.targetDate ? new Date(body.targetDate) : body.targetDate === null ? null : undefined,
@@ -47,7 +48,7 @@ export const PATCH = withErrorHandler(
       familyId: actor.familyId,
       actorId: actor.clerkId,
       action: AuditAction.GOAL_UPDATED,
-      targetId: params.id,
+      targetId: id,
       metadata: body,
     });
 
@@ -57,22 +58,23 @@ export const PATCH = withErrorHandler(
 
 export const DELETE = withErrorHandler(
   async (_req: Request, ctx: unknown) => {
-    const { params } = ctx as { params: { id: string } };
+    const { params } = ctx as { params: Promise<{ id: string }> };
+    const { id } = await params;
     const actor = await requireAnyFamilyMember();
     await requireRole(actor.familyId, Role.PARENT_ADMIN);
 
-    const goal = await prisma.goal.findUnique({ where: { id: params.id } });
+    const goal = await prisma.goal.findUnique({ where: { id } });
     if (!goal || goal.familyId !== actor.familyId) {
       throw new ApiError(404, "Goal not found");
     }
 
-    await prisma.goal.delete({ where: { id: params.id } });
+    await prisma.goal.delete({ where: { id } });
 
     await audit({
       familyId: actor.familyId,
       actorId: actor.clerkId,
       action: AuditAction.GOAL_DELETED,
-      targetId: params.id,
+      targetId: id,
       metadata: { name: goal.name },
     });
 

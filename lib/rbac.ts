@@ -5,7 +5,7 @@
  */
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { Role, type FamilyMember } from "@prisma/client";
+import { Role, type Family, type FamilyMember } from "@prisma/client";
 
 export type { Role };
 
@@ -47,9 +47,7 @@ export async function requireAuth(): Promise<string> {
  * Returns the FamilyMember record for the authenticated user in the given
  * family, or throws if the user is not a member.
  */
-export async function requireFamilyMember(
-  familyId: string
-): Promise<FamilyMember> {
+export async function requireFamilyMember(familyId: string): Promise<FamilyMember> {
   const clerkId = await requireAuth();
   const member = await prisma.familyMember.findUnique({
     where: { familyId_clerkId: { familyId, clerkId } },
@@ -63,17 +61,21 @@ export async function requireFamilyMember(
 /**
  * Returns the FamilyMember record for the authenticated user in the given
  * family, and asserts that their role is at least `minRole`.
+ *
+ * Alias-friendly name that mirrors the problem-statement contract.
  */
-export async function requireRole(
-  familyId: string,
-  minRole: Role
-): Promise<FamilyMember> {
+export async function requireFamilyRole(familyId: string, minRole: Role): Promise<FamilyMember> {
+  return requireRole(familyId, minRole);
+}
+
+/**
+ * Returns the FamilyMember record for the authenticated user in the given
+ * family, and asserts that their role is at least `minRole`.
+ */
+export async function requireRole(familyId: string, minRole: Role): Promise<FamilyMember> {
   const member = await requireFamilyMember(familyId);
   if (!isAtLeast(member.role, minRole)) {
-    throw new ApiError(
-      403,
-      `Requires role ${minRole} or higher (current: ${member.role})`
-    );
+    throw new ApiError(403, `Requires role ${minRole} or higher (current: ${member.role})`);
   }
   return member;
 }
@@ -91,6 +93,26 @@ export async function requireAnyFamilyMember(): Promise<FamilyMember> {
     throw new ApiError(403, "You are not a member of any family");
   }
   return member;
+}
+
+/**
+ * Returns the Family record for the authenticated user.
+ * Throws 401 if not logged in, 403 if the user is not yet in a family.
+ *
+ * Useful in Server Components and API routes that need the full Family object:
+ *
+ *   const family = await getActiveFamily();
+ */
+export async function getActiveFamily(): Promise<Family> {
+  const member = await requireAnyFamilyMember();
+  const family = await prisma.family.findUnique({
+    where: { id: member.familyId },
+  });
+  if (!family) {
+    // Should never happen due to FK constraints, but guard anyway.
+    throw new ApiError(500, "Family record not found");
+  }
+  return family;
 }
 
 // ------------------------------------------------------------------
@@ -111,9 +133,7 @@ export class ApiError extends Error {
  * Wrap a route handler so ApiErrors are returned as JSON and unexpected
  * errors are returned as 500.
  */
-export function withErrorHandler(
-  handler: (req: Request, ctx?: unknown) => Promise<Response>
-) {
+export function withErrorHandler(handler: (req: Request, ctx?: unknown) => Promise<Response>) {
   return async (req: Request, ctx?: unknown): Promise<Response> => {
     try {
       return await handler(req, ctx);

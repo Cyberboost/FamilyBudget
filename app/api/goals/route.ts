@@ -5,11 +5,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import {
-  requireAnyFamilyMember,
-  requireRole,
-  withErrorHandler,
-} from "@/lib/rbac";
+import { requireAnyFamilyMember, requireRole, withErrorHandler } from "@/lib/rbac";
 import { Role } from "@prisma/client";
 import { audit, AuditAction } from "@/lib/audit";
 

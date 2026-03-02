@@ -28,12 +28,8 @@ export default async function KidsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-indigo-700">
-          Hi, {name}! 👋
-        </h1>
-        <p className="text-gray-500 mt-1">
-          Here are your goals and savings progress.
-        </p>
+        <h1 className="text-3xl font-bold text-indigo-700">Hi, {name}! 👋</h1>
+        <p className="text-gray-500 mt-1">Here are your goals and savings progress.</p>
       </div>
 
       {/* Goals */}
@@ -51,14 +47,10 @@ export default async function KidsPage() {
               100,
               (Number(goal.savedAmount) / Number(goal.targetAmount)) * 100
             );
-            const remaining = Math.max(
-              0,
-              Number(goal.targetAmount) - Number(goal.savedAmount)
-            );
+            const remaining = Math.max(0, Number(goal.targetAmount) - Number(goal.savedAmount));
             const daysLeft = goal.targetDate
               ? Math.ceil(
-                  (new Date(goal.targetDate).getTime() - Date.now()) /
-                    (1000 * 60 * 60 * 24)
+                  (new Date(goal.targetDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
                 )
               : null;
 
@@ -70,9 +62,7 @@ export default async function KidsPage() {
                 }`}
               >
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="text-4xl">
-                    {goal.isCompleted ? "🏆" : "⭐"}
-                  </div>
+                  <div className="text-4xl">{goal.isCompleted ? "🏆" : "⭐"}</div>
                   <div>
                     <h3 className="font-bold text-xl text-gray-800">{goal.name}</h3>
                     {goal.description && (
@@ -107,8 +97,7 @@ export default async function KidsPage() {
 
                 {!goal.isCompleted && (
                   <div className="text-sm text-gray-600">
-                    Still need:{" "}
-                    <strong className="text-gray-800">${remaining.toFixed(2)}</strong>
+                    Still need: <strong className="text-gray-800">${remaining.toFixed(2)}</strong>
                   </div>
                 )}
 
@@ -129,9 +118,7 @@ export default async function KidsPage() {
                 )}
 
                 {goal.isCompleted && (
-                  <div className="mt-2 text-green-700 font-semibold text-sm">
-                    🎉 Goal complete!
-                  </div>
+                  <div className="mt-2 text-green-700 font-semibold text-sm">🎉 Goal complete!</div>
                 )}
               </div>
             );
@@ -146,8 +133,8 @@ export default async function KidsPage() {
           <div>
             <h2 className="font-semibold text-amber-800">Allowance</h2>
             <p className="text-sm text-amber-700">
-              Allowance tracking is coming soon! Your parents will be able to record
-              your allowance here.
+              Allowance tracking is coming soon! Your parents will be able to record your allowance
+              here.
             </p>
           </div>
         </div>

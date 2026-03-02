@@ -7,12 +7,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { addDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
-import {
-  requireRole,
-  requireAnyFamilyMember,
-  ApiError,
-  withErrorHandler,
-} from "@/lib/rbac";
+import { requireRole, requireAnyFamilyMember, ApiError, withErrorHandler } from "@/lib/rbac";
 import { Role } from "@prisma/client";
 import { audit, AuditAction } from "@/lib/audit";
 
@@ -60,7 +55,13 @@ export const POST = withErrorHandler(async (req: Request) => {
 
   // In production you would send an email here with the invite URL:
   // ${process.env.NEXT_PUBLIC_APP_URL}/invites/accept?token=${invite.token}
-  return Response.json({ invite, inviteUrl: `${process.env.NEXT_PUBLIC_APP_URL}/invites/accept?token=${invite.token}` }, { status: 201 });
+  return Response.json(
+    {
+      invite,
+      inviteUrl: `${process.env.NEXT_PUBLIC_APP_URL}/invites/accept?token=${invite.token}`,
+    },
+    { status: 201 }
+  );
 });
 
 export const GET = withErrorHandler(async () => {

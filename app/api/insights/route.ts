@@ -9,13 +9,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAnyFamilyMember, ApiError, withErrorHandler } from "@/lib/rbac";
 import { Role } from "@prisma/client";
-import {
-  startOfMonth,
-  endOfMonth,
-  subMonths,
-  differenceInDays,
-  getDaysInMonth,
-} from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, differenceInDays, getDaysInMonth } from "date-fns";
 
 export const GET = withErrorHandler(async (req: Request) => {
   const actor = await requireAnyFamilyMember();
@@ -57,10 +51,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   });
 
   const lastMonthMap = new Map(
-    lastMonthSpending.map((s) => [
-      s.category ?? "Uncategorized",
-      Number(s._sum.amount ?? 0),
-    ])
+    lastMonthSpending.map((s) => [s.category ?? "Uncategorized", Number(s._sum.amount ?? 0)])
   );
 
   // Top categories with MoM delta
@@ -84,10 +75,7 @@ export const GET = withErrorHandler(async (req: Request) => {
   const monthProgress = daysElapsed / daysInMonth;
 
   const spendingMap = new Map(
-    thisMonthSpending.map((s) => [
-      s.category ?? "Uncategorized",
-      Number(s._sum.amount ?? 0),
-    ])
+    thisMonthSpending.map((s) => [s.category ?? "Uncategorized", Number(s._sum.amount ?? 0)])
   );
 
   const burnRates = budgets.map((b) => {
@@ -101,24 +89,13 @@ export const GET = withErrorHandler(async (req: Request) => {
       monthProgress: Math.round(monthProgress * 100),
       spendProgress: Math.round(spendProgress * 100),
       burnRate: Math.round(burnRate * 100), // > 100 means overspending pace
-      status:
-        burnRate > 1.1
-          ? "overspending"
-          : burnRate > 0.9
-            ? "on-track"
-            : "under-budget",
+      status: burnRate > 1.1 ? "overspending" : burnRate > 0.9 ? "on-track" : "under-budget",
     };
   });
 
   // Total this month vs last month
-  const totalThisMonth = thisMonthSpending.reduce(
-    (acc, s) => acc + Number(s._sum.amount ?? 0),
-    0
-  );
-  const totalLastMonth = lastMonthSpending.reduce(
-    (acc, s) => acc + Number(s._sum.amount ?? 0),
-    0
-  );
+  const totalThisMonth = thisMonthSpending.reduce((acc, s) => acc + Number(s._sum.amount ?? 0), 0);
+  const totalLastMonth = lastMonthSpending.reduce((acc, s) => acc + Number(s._sum.amount ?? 0), 0);
 
   return Response.json({
     period: { year, month, daysElapsed, daysInMonth },
@@ -129,9 +106,7 @@ export const GET = withErrorHandler(async (req: Request) => {
       lastMonth: totalLastMonth,
       delta: totalThisMonth - totalLastMonth,
       deltaPercent:
-        totalLastMonth > 0
-          ? ((totalThisMonth - totalLastMonth) / totalLastMonth) * 100
-          : null,
+        totalLastMonth > 0 ? ((totalThisMonth - totalLastMonth) / totalLastMonth) * 100 : null,
     },
   });
 });

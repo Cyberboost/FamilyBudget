@@ -21,10 +21,7 @@ let upstashLimiter: {
   limit: (key: string) => Promise<{ success: boolean; remaining: number }>;
 } | null = null;
 
-if (
-  process.env.UPSTASH_REDIS_REST_URL &&
-  process.env.UPSTASH_REDIS_REST_TOKEN
-) {
+if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
   // Dynamic import so the build doesn't fail when Upstash is not configured
   (async () => {
     const { Redis } = await import("@upstash/redis");

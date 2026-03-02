@@ -46,9 +46,7 @@ export default async function TransactionsPage({
   ]);
 
   const pages = Math.ceil(total / pageSize);
-  const uniqueCategories = categories
-    .map((c) => c.category ?? "Uncategorized")
-    .filter(Boolean);
+  const uniqueCategories = categories.map((c) => c.category ?? "Uncategorized").filter(Boolean);
 
   return (
     <div className="space-y-6">
@@ -97,9 +95,7 @@ export default async function TransactionsPage({
       {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {transactions.length === 0 ? (
-          <div className="p-12 text-center text-gray-400">
-            No transactions found.
-          </div>
+          <div className="p-12 text-center text-gray-400">No transactions found.</div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">

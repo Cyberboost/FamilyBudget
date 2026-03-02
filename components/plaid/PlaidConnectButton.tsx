@@ -1,11 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import {
-  usePlaidLink,
-  PlaidLinkOnSuccess,
-  PlaidLinkOnExit,
-} from "react-plaid-link";
+import { usePlaidLink, PlaidLinkOnSuccess, PlaidLinkOnExit } from "react-plaid-link";
 
 interface PlaidConnectButtonProps {
   onSuccess?: () => void;
@@ -80,9 +76,7 @@ export function PlaidConnectButton({ onSuccess }: PlaidConnectButtonProps) {
       >
         {loading ? "Connecting…" : "+ Connect Bank"}
       </button>
-      {error && (
-        <p className="text-red-600 text-xs mt-2">{error}</p>
-      )}
+      {error && <p className="text-red-600 text-xs mt-2">{error}</p>}
     </div>
   );
 }

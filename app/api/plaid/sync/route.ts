@@ -130,10 +130,7 @@ export const POST = withErrorHandler(async (req: Request) => {
 /**
  * Check merchant rules and return the matching category if any.
  */
-async function applyMerchantRules(
-  familyId: string,
-  merchantName: string
-): Promise<string | null> {
+async function applyMerchantRules(familyId: string, merchantName: string): Promise<string | null> {
   const rules = await prisma.merchantRule.findMany({
     where: { familyId },
   });

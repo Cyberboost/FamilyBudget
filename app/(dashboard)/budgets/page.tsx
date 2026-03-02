@@ -40,10 +40,7 @@ export default async function BudgetsPage({
   ]);
 
   const spendingMap = new Map(
-    spendingByCategory.map((s) => [
-      s.category ?? "Uncategorized",
-      Number(s._sum.amount ?? 0),
-    ])
+    spendingByCategory.map((s) => [s.category ?? "Uncategorized", Number(s._sum.amount ?? 0)])
   );
 
   const budgetRows = budgets.map((b) => {
@@ -112,16 +109,11 @@ export default async function BudgetsPage({
       ) : (
         <div className="space-y-3">
           {budgetRows.map((b) => (
-            <div
-              key={b.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-200 p-4"
-            >
+            <div key={b.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="font-medium text-gray-800">{b.category}</span>
                 <div className="text-sm text-right">
-                  <span
-                    className={b.overspent ? "text-red-600 font-bold" : "text-gray-800"}
-                  >
+                  <span className={b.overspent ? "text-red-600 font-bold" : "text-gray-800"}>
                     ${b.spent.toFixed(2)}
                   </span>
                   <span className="text-gray-400"> / ${Number(b.limitAmount).toFixed(2)}</span>

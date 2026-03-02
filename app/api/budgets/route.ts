@@ -6,12 +6,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import {
-  requireAnyFamilyMember,
-  requireRole,
-  ApiError,
-  withErrorHandler,
-} from "@/lib/rbac";
+import { requireAnyFamilyMember, requireRole, ApiError, withErrorHandler } from "@/lib/rbac";
 import { Role } from "@prisma/client";
 import { audit, AuditAction } from "@/lib/audit";
 import { startOfMonth, endOfMonth } from "date-fns";
@@ -67,7 +62,12 @@ export const GET = withErrorHandler(async (req: Request) => {
   const totalBudget = budgets.reduce((acc, b) => acc + Number(b.limitAmount), 0);
   const totalSpent = summary.reduce((acc, s) => acc + s.spent, 0);
 
-  return Response.json({ budgets: summary, totalBudget, totalSpent, totalRemaining: totalBudget - totalSpent });
+  return Response.json({
+    budgets: summary,
+    totalBudget,
+    totalSpent,
+    totalRemaining: totalBudget - totalSpent,
+  });
 });
 
 const createSchema = z.object({
@@ -108,7 +108,12 @@ export const POST = withErrorHandler(async (req: Request) => {
     actorId: actor.clerkId,
     action: AuditAction.BUDGET_UPDATED,
     targetId: budget.id,
-    metadata: { category: body.category, limitAmount: body.limitAmount, year: body.year, month: body.month },
+    metadata: {
+      category: body.category,
+      limitAmount: body.limitAmount,
+      year: body.year,
+      month: body.month,
+    },
   });
 
   return Response.json(budget, { status: 201 });

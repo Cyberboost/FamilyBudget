@@ -14,11 +14,7 @@ const nav = [
   { href: "/settings", label: "Settings", icon: "⚙️" },
 ];
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (

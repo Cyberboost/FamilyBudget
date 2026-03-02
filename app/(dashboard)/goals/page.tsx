@@ -58,8 +58,7 @@ export default async function GoalsPage() {
             );
             const daysLeft = goal.targetDate
               ? Math.ceil(
-                  (new Date(goal.targetDate).getTime() - Date.now()) /
-                    (1000 * 60 * 60 * 24)
+                  (new Date(goal.targetDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
                 )
               : null;
 
@@ -67,9 +66,7 @@ export default async function GoalsPage() {
               <div
                 key={goal.id}
                 className={`bg-white rounded-xl shadow-sm border p-6 ${
-                  goal.isCompleted
-                    ? "border-green-200 bg-green-50"
-                    : "border-gray-200"
+                  goal.isCompleted ? "border-green-200 bg-green-50" : "border-gray-200"
                 }`}
               >
                 <div className="flex items-start justify-between mb-3">
@@ -90,7 +87,8 @@ export default async function GoalsPage() {
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-gray-500">Progress</span>
                     <span className="font-medium">
-                      ${Number(goal.savedAmount).toFixed(2)} / ${Number(goal.targetAmount).toFixed(2)}
+                      ${Number(goal.savedAmount).toFixed(2)} / $
+                      {Number(goal.targetAmount).toFixed(2)}
                     </span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-3">

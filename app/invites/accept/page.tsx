@@ -10,9 +10,7 @@ export default function AcceptInvitePage() {
   const { user, isLoaded } = useUser();
   const token = searchParams.get("token") ?? "";
 
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">(
-    "idle"
-  );
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
@@ -24,8 +22,7 @@ export default function AcceptInvitePage() {
   async function acceptInvite() {
     setStatus("loading");
     try {
-      const email =
-        user?.primaryEmailAddress?.emailAddress ?? "";
+      const email = user?.primaryEmailAddress?.emailAddress ?? "";
       const res = await fetch("/api/invites/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -49,25 +46,19 @@ export default function AcceptInvitePage() {
         {status === "idle" || status === "loading" ? (
           <>
             <div className="text-4xl mb-4">⏳</div>
-            <h1 className="text-xl font-bold text-gray-800 mb-2">
-              Accepting your invite…
-            </h1>
+            <h1 className="text-xl font-bold text-gray-800 mb-2">Accepting your invite…</h1>
             <p className="text-gray-500 text-sm">Please wait a moment.</p>
           </>
         ) : status === "success" ? (
           <>
             <div className="text-4xl mb-4">🎉</div>
-            <h1 className="text-xl font-bold text-green-700 mb-2">
-              Welcome to the family!
-            </h1>
+            <h1 className="text-xl font-bold text-green-700 mb-2">Welcome to the family!</h1>
             <p className="text-gray-500 text-sm">Redirecting to your dashboard…</p>
           </>
         ) : (
           <>
             <div className="text-4xl mb-4">❌</div>
-            <h1 className="text-xl font-bold text-red-700 mb-2">
-              Could not accept invite
-            </h1>
+            <h1 className="text-xl font-bold text-red-700 mb-2">Could not accept invite</h1>
             <p className="text-red-600 text-sm bg-red-50 rounded-lg p-3">{errorMsg}</p>
             <a
               href="/dashboard"

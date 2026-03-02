@@ -1,0 +1,9 @@
+.next
+node_modules
+out
+build
+prisma/migrations
+package-lock.json
+public
+*.woff
+*.woff2

@@ -28,8 +28,8 @@ export const POST = withErrorHandler(async (req: Request) => {
   const clerk = await clerkClient();
   const clerkUser = await clerk.users.getUser(clerkId);
   const email =
-    clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)
-      ?.emailAddress ?? "";
+    clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress ??
+    "";
 
   const family = await prisma.$transaction(async (tx) => {
     const f = await tx.family.create({ data: { name: body.name } });

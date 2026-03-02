@@ -7,8 +7,8 @@ export default function HomePage() {
       <div className="max-w-2xl text-center">
         <h1 className="text-5xl font-bold text-indigo-700 mb-4">FamilyBudget</h1>
         <p className="text-xl text-gray-600 mb-8">
-          Secure family finance management. Connect your bank accounts, set budgets,
-          track goals, and give kids a clear view of family finances.
+          Secure family finance management. Connect your bank accounts, set budgets, track goals,
+          and give kids a clear view of family finances.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">

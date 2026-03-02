@@ -78,12 +78,7 @@ export default async function DashboardPage() {
           icon="🎯"
           href="/goals"
         />
-        <StatCard
-          label="Connected Banks"
-          value="–"
-          icon="🏦"
-          href="/settings"
-        />
+        <StatCard label="Connected Banks" value="–" icon="🏦" href="/settings" />
       </div>
 
       {/* Recent transactions */}
@@ -115,18 +110,14 @@ export default async function DashboardPage() {
             <tbody className="divide-y divide-gray-50">
               {recentTransactions.map((tx) => (
                 <tr key={tx.id}>
-                  <td className="py-2 text-gray-500">
-                    {new Date(tx.date).toLocaleDateString()}
-                  </td>
+                  <td className="py-2 text-gray-500">{new Date(tx.date).toLocaleDateString()}</td>
                   <td className="py-2 font-medium text-gray-800">{tx.name}</td>
                   <td className="py-2">
                     <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs">
                       {tx.category ?? "Uncategorized"}
                     </span>
                   </td>
-                  <td className="py-2 text-right font-medium">
-                    ${Number(tx.amount).toFixed(2)}
-                  </td>
+                  <td className="py-2 text-right font-medium">${Number(tx.amount).toFixed(2)}</td>
                 </tr>
               ))}
             </tbody>
@@ -154,7 +145,8 @@ export default async function DashboardPage() {
                   <div className="flex justify-between text-sm mb-1">
                     <span className="font-medium text-gray-800">{goal.name}</span>
                     <span className="text-gray-500">
-                      ${Number(goal.savedAmount).toFixed(0)} / ${Number(goal.targetAmount).toFixed(0)}
+                      ${Number(goal.savedAmount).toFixed(0)} / $
+                      {Number(goal.targetAmount).toFixed(0)}
                     </span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2">

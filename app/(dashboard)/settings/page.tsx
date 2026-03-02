@@ -38,9 +38,7 @@ export default async function SettingsPage() {
 
       {/* Family info */}
       <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">
-          Family Workspace
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">Family Workspace</h2>
         <div className="flex items-center justify-between">
           <div>
             <div className="font-medium text-gray-800">{member.family.name}</div>
@@ -72,9 +70,7 @@ export default async function SettingsPage() {
                 <div className="font-medium text-gray-800">
                   {item.institutionName ?? "Unknown Institution"}
                 </div>
-                <div className="text-sm text-gray-500 mt-1">
-                  {item.accounts.length} account(s)
-                </div>
+                <div className="text-sm text-gray-500 mt-1">{item.accounts.length} account(s)</div>
                 <div className="mt-2 space-y-1">
                   {item.accounts.map((acct) => (
                     <div key={acct.id} className="text-sm text-gray-600 flex gap-2">
@@ -122,9 +118,7 @@ export default async function SettingsPage() {
                     <span className="ml-2 text-xs text-indigo-600">(you)</span>
                   )}
                 </div>
-                {m.name && (
-                  <div className="text-sm text-gray-400">{m.email}</div>
-                )}
+                {m.name && <div className="text-sm text-gray-400">{m.email}</div>}
               </div>
               <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
                 {m.role.replace("_", " ")}

@@ -5,12 +5,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import {
-  requireAnyFamilyMember,
-  requireRole,
-  ApiError,
-  withErrorHandler,
-} from "@/lib/rbac";
+import { requireAnyFamilyMember, requireRole, ApiError, withErrorHandler } from "@/lib/rbac";
 import { Role } from "@prisma/client";
 import { audit, AuditAction } from "@/lib/audit";
 
@@ -23,61 +18,61 @@ const updateSchema = z.object({
   isCompleted: z.boolean().optional(),
 });
 
-export const PATCH = withErrorHandler(
-  async (req: Request, ctx: unknown) => {
-    const { params } = ctx as { params: Promise<{ id: string }> };
-    const { id } = await params;
-    const actor = await requireAnyFamilyMember();
-    await requireRole(actor.familyId, Role.PARENT);
+export const PATCH = withErrorHandler(async (req: Request, ctx: unknown) => {
+  const { params } = ctx as { params: Promise<{ id: string }> };
+  const { id } = await params;
+  const actor = await requireAnyFamilyMember();
+  await requireRole(actor.familyId, Role.PARENT);
 
-    const goal = await prisma.goal.findUnique({ where: { id } });
-    if (!goal || goal.familyId !== actor.familyId) {
-      throw new ApiError(404, "Goal not found");
-    }
-
-    const body = updateSchema.parse(await (req as NextRequest).json());
-    const updated = await prisma.goal.update({
-      where: { id },
-      data: {
-        ...body,
-        targetDate: body.targetDate ? new Date(body.targetDate) : body.targetDate === null ? null : undefined,
-      },
-    });
-
-    await audit({
-      familyId: actor.familyId,
-      actorId: actor.clerkId,
-      action: AuditAction.GOAL_UPDATED,
-      targetId: id,
-      metadata: body,
-    });
-
-    return Response.json(updated);
+  const goal = await prisma.goal.findUnique({ where: { id } });
+  if (!goal || goal.familyId !== actor.familyId) {
+    throw new ApiError(404, "Goal not found");
   }
-);
 
-export const DELETE = withErrorHandler(
-  async (_req: Request, ctx: unknown) => {
-    const { params } = ctx as { params: Promise<{ id: string }> };
-    const { id } = await params;
-    const actor = await requireAnyFamilyMember();
-    await requireRole(actor.familyId, Role.PARENT_ADMIN);
+  const body = updateSchema.parse(await (req as NextRequest).json());
+  const updated = await prisma.goal.update({
+    where: { id },
+    data: {
+      ...body,
+      targetDate: body.targetDate
+        ? new Date(body.targetDate)
+        : body.targetDate === null
+          ? null
+          : undefined,
+    },
+  });
 
-    const goal = await prisma.goal.findUnique({ where: { id } });
-    if (!goal || goal.familyId !== actor.familyId) {
-      throw new ApiError(404, "Goal not found");
-    }
+  await audit({
+    familyId: actor.familyId,
+    actorId: actor.clerkId,
+    action: AuditAction.GOAL_UPDATED,
+    targetId: id,
+    metadata: body,
+  });
 
-    await prisma.goal.delete({ where: { id } });
+  return Response.json(updated);
+});
 
-    await audit({
-      familyId: actor.familyId,
-      actorId: actor.clerkId,
-      action: AuditAction.GOAL_DELETED,
-      targetId: id,
-      metadata: { name: goal.name },
-    });
+export const DELETE = withErrorHandler(async (_req: Request, ctx: unknown) => {
+  const { params } = ctx as { params: Promise<{ id: string }> };
+  const { id } = await params;
+  const actor = await requireAnyFamilyMember();
+  await requireRole(actor.familyId, Role.PARENT_ADMIN);
 
-    return new Response(null, { status: 204 });
+  const goal = await prisma.goal.findUnique({ where: { id } });
+  if (!goal || goal.familyId !== actor.familyId) {
+    throw new ApiError(404, "Goal not found");
   }
-);
+
+  await prisma.goal.delete({ where: { id } });
+
+  await audit({
+    familyId: actor.familyId,
+    actorId: actor.clerkId,
+    action: AuditAction.GOAL_DELETED,
+    targetId: id,
+    metadata: { name: goal.name },
+  });
+
+  return new Response(null, { status: 204 });
+});

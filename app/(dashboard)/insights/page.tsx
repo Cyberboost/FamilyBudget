@@ -61,10 +61,7 @@ export default async function InsightsPage() {
   const totalThis = thisMonth.reduce((a, s) => a + Number(s._sum.amount ?? 0), 0);
   const totalLast = lastMonth.reduce((a, s) => a + Number(s._sum.amount ?? 0), 0);
 
-  const daysElapsed = Math.min(
-    now.getDate(),
-    new Date(year, month, 0).getDate()
-  );
+  const daysElapsed = Math.min(now.getDate(), new Date(year, month, 0).getDate());
   const daysInMonth = new Date(year, month, 0).getDate();
   const monthPct = daysElapsed / daysInMonth;
 
@@ -82,8 +79,7 @@ export default async function InsightsPage() {
       limit,
       spent,
       burnRate,
-      status:
-        burnRate > 1.1 ? "overspending" : burnRate > 0.9 ? "on-track" : "under-budget",
+      status: burnRate > 1.1 ? "overspending" : burnRate > 0.9 ? "on-track" : "under-budget",
     };
   });
 
@@ -102,9 +98,7 @@ export default async function InsightsPage() {
           <div className="text-sm text-gray-500 mb-1">This month total</div>
           <div className="text-3xl font-bold text-gray-900">${totalThis.toFixed(2)}</div>
           <div
-            className={`text-sm mt-1 ${
-              totalThis > totalLast ? "text-red-500" : "text-green-600"
-            }`}
+            className={`text-sm mt-1 ${totalThis > totalLast ? "text-red-500" : "text-green-600"}`}
           >
             {totalLast > 0
               ? `${totalThis > totalLast ? "▲" : "▼"} ${Math.abs(
@@ -115,9 +109,7 @@ export default async function InsightsPage() {
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="text-sm text-gray-500 mb-1">Month progress</div>
-          <div className="text-3xl font-bold text-gray-900">
-            {Math.round(monthPct * 100)}%
-          </div>
+          <div className="text-3xl font-bold text-gray-900">{Math.round(monthPct * 100)}%</div>
           <div className="text-sm text-gray-400 mt-1">
             Day {daysElapsed} of {daysInMonth}
           </div>
@@ -126,9 +118,7 @@ export default async function InsightsPage() {
 
       {/* Top categories */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">
-          Top Spending Categories
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">Top Spending Categories</h2>
         {topCategories.length === 0 ? (
           <p className="text-gray-400 text-sm">No spending data for this month.</p>
         ) : (
@@ -153,12 +143,14 @@ export default async function InsightsPage() {
                     />
                   </div>
                 </div>
-                <div className="text-sm font-medium w-20 text-right">
-                  ${cat.thisAmt.toFixed(0)}
-                </div>
+                <div className="text-sm font-medium w-20 text-right">${cat.thisAmt.toFixed(0)}</div>
                 <div
                   className={`text-xs w-16 text-right ${
-                    cat.delta > 0 ? "text-red-500" : cat.delta < 0 ? "text-green-600" : "text-gray-400"
+                    cat.delta > 0
+                      ? "text-red-500"
+                      : cat.delta < 0
+                        ? "text-green-600"
+                        : "text-gray-400"
                   }`}
                 >
                   {cat.pct !== null

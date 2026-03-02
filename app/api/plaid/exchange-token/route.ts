@@ -74,11 +74,7 @@ export const POST = withErrorHandler(async (req: Request) => {
 /**
  * Fetch accounts from Plaid and upsert into DB.
  */
-async function syncAccounts(
-  accessToken: string,
-  plaidItemDbId: string,
-  familyId: string
-) {
+async function syncAccounts(accessToken: string, plaidItemDbId: string, familyId: string) {
   const resp = await plaidClient.accountsGet({ access_token: accessToken });
   for (const acct of resp.data.accounts) {
     await prisma.account.upsert({

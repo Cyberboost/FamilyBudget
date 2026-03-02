@@ -1,5 +1,25 @@
 // Prisma schema for FamilyBudget
-// Every data row is scoped to familyId (multi-tenant)
+// Every data row is scoped to familyId (strict multi-tenancy).
+//
+// ROW-LEVEL ACCESS ENFORCEMENT (application-layer notes)
+// -------------------------------------------------------
+// Prisma does not enforce row-level security on its own. Every query that
+// touches family-scoped data MUST include `familyId` in the `where` clause.
+// The helpers in lib/rbac.ts enforce this at the HTTP layer:
+//
+//   1. requireAuth()              – asserts a valid Clerk session; returns clerkId.
+//   2. requireAnyFamilyMember()   – loads the FamilyMember row for the current user;
+//                                   throws 403 if not a member of any family.
+//   3. requireFamilyRole(id, role) – same as above plus a minimum-role assertion.
+//   4. getActiveFamily()          – returns the Family record for the current user.
+//
+// All route handlers call one of these before issuing ANY Prisma query. The
+// returned `member.familyId` is then threaded into every subsequent query so
+// a user can never read or write data belonging to another family.
+//
+// PostgreSQL Row-Level Security (RLS) can be added later as a defence-in-depth
+// layer but is not required while all DB access goes through a single
+// server-side service account.
 
 generator client {
   provider = "prisma-client-js"
@@ -20,11 +40,57 @@ enum Role {
   KID
 }
 
+enum MemberStatus {
+  ACTIVE
+  SUSPENDED
+}
+
 enum InviteStatus {
   PENDING
   ACCEPTED
   EXPIRED
   REVOKED
+}
+
+enum PlaidItemStatus {
+  GOOD
+  ERROR
+  PENDING_EXPIRATION
+  REVOKED
+}
+
+/// How a CategoryRule matches a transaction's merchant name / description.
+enum MatchType {
+  CONTAINS
+  STARTS_WITH
+  REGEX
+}
+
+enum GoalType {
+  SAVINGS
+  SPENDING
+  DEBT
+}
+
+/// Controls who can see a goal.
+/// PRIVATE            – visible only to the parent who created it.
+/// FAMILY             – visible to all PARENT/TEEN members.
+/// SHARED_WITH_MEMBERS – visible to the clerkIds listed in GoalShare.
+enum GoalVisibility {
+  PRIVATE
+  FAMILY
+  SHARED_WITH_MEMBERS
+}
+
+enum CadenceType {
+  WEEKLY
+  MONTHLY
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  DENIED
 }
 
 enum AuditAction {
@@ -33,12 +99,13 @@ enum AuditAction {
   INVITE_ACCEPTED
   INVITE_REVOKED
   ROLE_CHANGED
+  MEMBER_REMOVED
   BANK_CONNECTED
   BANK_DISCONNECTED
   TRANSACTION_SYNCED
   CATEGORY_OVERRIDDEN
-  MERCHANT_RULE_CREATED
-  MERCHANT_RULE_DELETED
+  CATEGORY_RULE_CREATED
+  CATEGORY_RULE_DELETED
   BUDGET_CREATED
   BUDGET_UPDATED
   BUDGET_DELETED
@@ -46,7 +113,31 @@ enum AuditAction {
   GOAL_UPDATED
   GOAL_DELETED
   GOAL_SHARE_CHANGED
-  MEMBER_REMOVED
+  ALLOWANCE_CREATED
+  ALLOWANCE_UPDATED
+  ALLOWANCE_DELETED
+  REQUEST_SUBMITTED
+  REQUEST_DECIDED
+  INSIGHT_GENERATED
+}
+
+// ------------------------------------------------------------------
+// User  (minimal – Clerk is the source of truth for auth)
+// ------------------------------------------------------------------
+
+/// Thin local mirror of the Clerk user. Populated on first sign-in via a
+/// Clerk webhook or on-demand. Do not store passwords here.
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String
+  firstName String?
+  lastName  String?
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clerkId])
 }
 
 // ------------------------------------------------------------------
@@ -59,28 +150,35 @@ model Family {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  members     FamilyMember[]
-  invites     Invite[]
-  plaidItems  PlaidItem[]
-  accounts    Account[]
-  transactions Transaction[]
-  budgets     Budget[]
-  goals       Goal[]
-  merchantRules MerchantRule[]
-  auditLogs   AuditLog[]
+  members       FamilyMember[]
+  invites       Invite[]
+  plaidItems    PlaidItem[]
+  accounts      Account[]
+  transactions  Transaction[]
+  categoryRules CategoryRule[]
+  budgetMonths  BudgetMonth[]
+  goals         Goal[]
+  allowances    Allowance[]
+  requests      Request[]
+  insightWeeks  InsightWeekly[]
+  auditLogs     AuditLog[]
 }
 
 model FamilyMember {
-  id        String   @id @default(cuid())
-  familyId  String
-  clerkId   String   // Clerk user ID
-  email     String
-  name      String?
-  role      Role
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String       @id @default(cuid())
+  familyId        String
+  clerkId         String       // Clerk user ID
+  email           String
+  name            String?
+  role            Role
+  /// Fine-grained permission overrides stored as JSON, e.g.
+  /// { "canViewTransactions": false, "allowanceVisible": true }
+  permissionsJson Json?
+  status          MemberStatus @default(ACTIVE)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
-  family    Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
 
   @@unique([familyId, clerkId])
   @@index([clerkId])
@@ -95,10 +193,11 @@ model Invite {
   status     InviteStatus @default(PENDING)
   invitedBy  String       // clerkId of inviter
   expiresAt  DateTime
+  acceptedAt DateTime? // set when status transitions to ACCEPTED
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
 
-  family     Family       @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
 
   @@index([token])
   @@index([email])
@@ -109,43 +208,44 @@ model Invite {
 // ------------------------------------------------------------------
 
 model PlaidItem {
-  id                  String   @id @default(cuid())
-  familyId            String
-  plaidItemId         String   @unique  // Plaid item_id
-  encryptedAccessToken String          // AES-256-GCM encrypted
-  institutionId       String?
-  institutionName     String?
-  consentExpiresAt    DateTime?
-  cursor              String?          // transactions sync cursor
-  lastSyncedAt        DateTime?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                   String          @id @default(cuid())
+  familyId             String
+  plaidItemId          String          @unique // Plaid item_id
+  encryptedAccessToken String // AES-256-GCM encrypted; never stored in plaintext
+  institutionId        String?
+  institutionName      String?
+  status               PlaidItemStatus @default(GOOD)
+  consentExpiresAt     DateTime?
+  cursor               String? // transactions/sync cursor for incremental updates
+  lastSyncedAt         DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
 
-  family              Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  accounts            Account[]
+  family   Family    @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  accounts Account[]
 
   @@index([familyId])
 }
 
 model Account {
-  id            String   @id @default(cuid())
-  familyId      String
-  plaidItemId   String
-  plaidAccountId String  @unique   // Plaid account_id
-  name          String
-  officialName  String?
-  type          String             // depository, credit, investment, etc.
-  subtype       String?
-  mask          String?            // last 4 digits
-  currentBalance Decimal?         @db.Decimal(18, 2)
-  availableBalance Decimal?       @db.Decimal(18, 2)
-  isoCurrencyCode String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String   @id @default(cuid())
+  familyId         String
+  plaidItemId      String
+  plaidAccountId   String   @unique // Plaid account_id
+  name             String
+  officialName     String?
+  type             String // depository | credit | investment | loan | other
+  subtype          String?
+  mask             String? // last 4 digits
+  currentBalance   Decimal? @db.Decimal(18, 2)
+  availableBalance Decimal? @db.Decimal(18, 2)
+  isoCurrencyCode  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  family        Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  plaidItem     PlaidItem @relation(fields: [plaidItemId], references: [id], onDelete: Cascade)
-  transactions  Transaction[]
+  family       Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  plaidItem    PlaidItem     @relation(fields: [plaidItemId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
 
   @@index([familyId])
 }
@@ -155,65 +255,97 @@ model Account {
 // ------------------------------------------------------------------
 
 model Transaction {
-  id                  String   @id @default(cuid())
-  familyId            String
-  accountId           String
-  plaidTransactionId  String   @unique
-  amount              Decimal  @db.Decimal(18, 2)   // positive = debit
-  isoCurrencyCode     String?
-  date                DateTime @db.Date
-  name                String                         // merchant/description
-  merchantName        String?
-  category            String?                        // user-visible category
-  plaidCategory       String?                        // raw Plaid category
-  pending             Boolean  @default(false)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  familyId             String
+  accountId            String
+  plaidTransactionId   String   @unique
+  amount               Decimal  @db.Decimal(18, 2) // positive = debit
+  isoCurrencyCode      String?
+  date                 DateTime @db.Date
+  name                 String // merchant name or description from Plaid
+  merchantName         String?
+  /// Plaid personal_finance_category.primary (e.g. "FOOD_AND_DRINK")
+  categoryPrimary      String?
+  /// Plaid personal_finance_category.detailed (e.g. "FOOD_AND_DRINK_FAST_FOOD")
+  categoryDetailed     String?
+  /// Parent-supplied category override; takes precedence over categoryPrimary
+  userCategoryOverride String?
+  /// ID of the CategoryRule that last set the category, if any
+  ruleAppliedId        String?
+  /// Classifier confidence score (0.0–1.0); null for rule-based overrides
+  confidence           Float?
+  pending              Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  family              Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  account             Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  family       Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  account      Account       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  categoryRule CategoryRule? @relation(fields: [ruleAppliedId], references: [id], onDelete: SetNull)
 
   @@index([familyId, date])
-  @@index([familyId, category])
+  @@index([familyId, categoryPrimary])
+  @@index([ruleAppliedId])
 }
 
 // ------------------------------------------------------------------
-// Merchant → Category rules
+// Category Rules  (replaces MerchantRule with richer matching)
 // ------------------------------------------------------------------
 
-model MerchantRule {
-  id           String   @id @default(cuid())
-  familyId     String
-  merchantName String   // pattern to match (case-insensitive contains)
-  category     String
-  createdBy    String   // clerkId
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+/// Rules that auto-classify transactions based on merchant name / description.
+/// Rules are evaluated in descending priority order; first match wins.
+model CategoryRule {
+  id               String    @id @default(cuid())
+  familyId         String
+  matchType        MatchType @default(CONTAINS)
+  /// Value to match against the transaction's merchantName or name field.
+  matchValue       String
+  categoryPrimary  String
+  categoryDetailed String?
+  /// Higher priority rules are evaluated first (default 0).
+  priority         Int       @default(0)
+  isActive         Boolean   @default(true)
+  createdBy        String // clerkId
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  family       Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  family       Family        @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
 
-  @@index([familyId])
+  @@index([familyId, isActive])
+  @@index([familyId, priority])
 }
 
 // ------------------------------------------------------------------
-// Budgets
+// Budgets  (BudgetMonth owns a set of per-category limits)
 // ------------------------------------------------------------------
 
-model Budget {
+/// One budget plan per family per calendar month.
+model BudgetMonth {
   id        String   @id @default(cuid())
   familyId  String
-  month     Int      // 1-12
-  year      Int
-  category  String
-  limitAmount Decimal @db.Decimal(18, 2)
-  createdBy String   // clerkId
+  /// ISO month string in YYYY-MM format, e.g. "2025-03".
+  month     String
+  createdBy String // clerkId
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  family    Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  family     Family           @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  categories BudgetCategory[]
 
-  @@unique([familyId, year, month, category])
-  @@index([familyId, year, month])
+  @@unique([familyId, month])
+  @@index([familyId, month])
+}
+
+/// Per-category spending limit within a BudgetMonth.
+model BudgetCategory {
+  id              String  @id @default(cuid())
+  budgetMonthId   String
+  categoryPrimary String
+  limitAmount     Decimal @db.Decimal(18, 2)
+
+  budgetMonth BudgetMonth @relation(fields: [budgetMonthId], references: [id], onDelete: Cascade)
+
+  @@unique([budgetMonthId, categoryPrimary])
 }
 
 // ------------------------------------------------------------------
@@ -221,33 +353,99 @@ model Budget {
 // ------------------------------------------------------------------
 
 model Goal {
-  id           String   @id @default(cuid())
+  id           String         @id @default(cuid())
   familyId     String
+  type         GoalType       @default(SAVINGS)
   name         String
   description  String?
-  targetAmount Decimal  @db.Decimal(18, 2)
-  savedAmount  Decimal  @default(0) @db.Decimal(18, 2)
+  targetAmount Decimal        @db.Decimal(18, 2)
+  savedAmount  Decimal        @default(0) @db.Decimal(18, 2)
   targetDate   DateTime?
-  isCompleted  Boolean  @default(false)
-  createdBy    String   // clerkId (parent)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  isCompleted  Boolean        @default(false)
+  /// Controls who can see this goal.
+  /// When SHARED_WITH_MEMBERS the GoalShare records determine exact visibility.
+  visibility   GoalVisibility @default(FAMILY)
+  createdBy    String // clerkId (parent)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
-  family       Family   @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  shares       GoalShare[]
+  family Family      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  shares GoalShare[]
 
   @@index([familyId])
 }
 
+/// Explicit per-member sharing record used when Goal.visibility = SHARED_WITH_MEMBERS.
 model GoalShare {
   id        String   @id @default(cuid())
   goalId    String
-  clerkId   String   // child member who can see this goal
+  clerkId   String // child member who can see this goal
   createdAt DateTime @default(now())
 
-  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  goal Goal @relation(fields: [goalId], references: [id], onDelete: Cascade)
 
   @@unique([goalId, clerkId])
+}
+
+// ------------------------------------------------------------------
+// Allowances
+// ------------------------------------------------------------------
+
+model Allowance {
+  id          String      @id @default(cuid())
+  familyId    String
+  childUserId String // clerkId of child
+  cadence     CadenceType
+  amount      Decimal     @db.Decimal(18, 2)
+  /// Optional envelope / jars config, e.g. { "spend": 0.5, "save": 0.3, "give": 0.2 }
+  jarsJson    Json?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, childUserId])
+  @@index([familyId])
+}
+
+// ------------------------------------------------------------------
+// Requests  (child requests money / purchase approval)
+// ------------------------------------------------------------------
+
+model Request {
+  id             String        @id @default(cuid())
+  familyId       String
+  childUserId    String // clerkId of the requesting child
+  amount         Decimal       @db.Decimal(18, 2)
+  reason         String
+  status         RequestStatus @default(PENDING)
+  approverUserId String? // clerkId of the parent who decided
+  decidedAt      DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@index([familyId, status])
+  @@index([familyId, childUserId])
+}
+
+// ------------------------------------------------------------------
+// Weekly Insights  (pre-computed stats, regenerated on schedule)
+// ------------------------------------------------------------------
+
+model InsightWeekly {
+  id            String   @id @default(cuid())
+  familyId      String
+  weekStartDate DateTime @db.Date // Monday of the week
+  /// Pre-computed statistics JSON, e.g. top categories, MoM deltas, burn rates.
+  statsJson     Json
+  createdAt     DateTime @default(now())
+
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
+
+  @@unique([familyId, weekStartDate])
+  @@index([familyId, weekStartDate])
 }
 
 // ------------------------------------------------------------------
@@ -255,16 +453,19 @@ model GoalShare {
 // ------------------------------------------------------------------
 
 model AuditLog {
-  id        String      @id @default(cuid())
-  familyId  String
-  actorId   String      // clerkId of actor (or "system")
-  action    AuditAction
-  targetId  String?     // ID of affected resource
-  metadata  Json?       // additional context
-  createdAt DateTime    @default(now())
+  id         String      @id @default(cuid())
+  familyId   String
+  actorId    String // clerkId of actor (use "system" for automated actions)
+  action     AuditAction
+  /// Type of the primary entity affected, e.g. "Transaction", "Goal", "Budget".
+  entityType String?
+  targetId   String? // ID of the affected entity
+  metadata   Json? // additional context / diff
+  createdAt  DateTime    @default(now())
 
-  family    Family      @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  family Family @relation(fields: [familyId], references: [id], onDelete: Cascade)
 
   @@index([familyId, createdAt])
   @@index([actorId])
+  @@index([familyId, entityType])
 }

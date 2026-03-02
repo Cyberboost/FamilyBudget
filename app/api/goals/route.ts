@@ -6,7 +6,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAnyFamilyMember, requireRole, withErrorHandler } from "@/lib/rbac";
-import { Role } from "@prisma/client";
+import { Role, GoalType, GoalVisibility } from "@prisma/client";
 import { audit, AuditAction } from "@/lib/audit";
 
 export const GET = withErrorHandler(async () => {
@@ -39,6 +39,8 @@ export const GET = withErrorHandler(async () => {
 const createSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(500).optional(),
+  type: z.nativeEnum(GoalType).default(GoalType.SAVINGS),
+  visibility: z.nativeEnum(GoalVisibility).default(GoalVisibility.FAMILY),
   targetAmount: z.number().positive(),
   savedAmount: z.number().min(0).optional().default(0),
   targetDate: z.string().datetime().optional(),
@@ -57,6 +59,8 @@ export const POST = withErrorHandler(async (req: Request) => {
         familyId: actor.familyId,
         name: body.name,
         description: body.description,
+        type: body.type,
+        visibility: body.visibility,
         targetAmount: body.targetAmount,
         savedAmount: body.savedAmount,
         targetDate: body.targetDate ? new Date(body.targetDate) : null,
@@ -78,6 +82,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     familyId: actor.familyId,
     actorId: actor.clerkId,
     action: AuditAction.GOAL_CREATED,
+    entityType: "Goal",
     targetId: goal.id,
     metadata: { name: body.name, targetAmount: body.targetAmount, sharedWith: body.sharedWith },
   });

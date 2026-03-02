@@ -58,6 +58,7 @@ export const PUT = withErrorHandler(async (req: Request, ctx: unknown) => {
     familyId: actor.familyId,
     actorId: actor.clerkId,
     action: AuditAction.GOAL_SHARE_CHANGED,
+    entityType: "Goal",
     targetId: id,
     metadata: { sharedWith: body.sharedWith },
   });

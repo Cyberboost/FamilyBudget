@@ -9,7 +9,14 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAnyFamilyMember, ApiError, withErrorHandler } from "@/lib/rbac";
 import { Role } from "@prisma/client";
-import { startOfMonth, endOfMonth, subMonths, differenceInDays, getDaysInMonth } from "date-fns";
+import {
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+  differenceInDays,
+  getDaysInMonth,
+  format,
+} from "date-fns";
 
 export const GET = withErrorHandler(async (req: Request) => {
   const actor = await requireAnyFamilyMember();
@@ -29,7 +36,7 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   // Spending this month by category
   const thisMonthSpending = await prisma.transaction.groupBy({
-    by: ["category"],
+    by: ["categoryPrimary"],
     where: {
       familyId: actor.familyId,
       date: { gte: thisMonthStart, lte: thisMonthEnd },
@@ -41,7 +48,7 @@ export const GET = withErrorHandler(async (req: Request) => {
 
   // Spending last month by category
   const lastMonthSpending = await prisma.transaction.groupBy({
-    by: ["category"],
+    by: ["categoryPrimary"],
     where: {
       familyId: actor.familyId,
       date: { gte: lastMonthStart, lte: lastMonthEnd },
@@ -51,12 +58,12 @@ export const GET = withErrorHandler(async (req: Request) => {
   });
 
   const lastMonthMap = new Map(
-    lastMonthSpending.map((s) => [s.category ?? "Uncategorized", Number(s._sum.amount ?? 0)])
+    lastMonthSpending.map((s) => [s.categoryPrimary ?? "Uncategorized", Number(s._sum.amount ?? 0)])
   );
 
   // Top categories with MoM delta
   const topCategories = thisMonthSpending.slice(0, 10).map((s) => {
-    const cat = s.category ?? "Uncategorized";
+    const cat = s.categoryPrimary ?? "Uncategorized";
     const thisAmt = Number(s._sum.amount ?? 0);
     const lastAmt = lastMonthMap.get(cat) ?? 0;
     const delta = thisAmt - lastAmt;
@@ -64,10 +71,13 @@ export const GET = withErrorHandler(async (req: Request) => {
     return { category: cat, amount: thisAmt, lastMonthAmount: lastAmt, delta, deltaPercent };
   });
 
-  // Budget burn rate
-  const budgets = await prisma.budget.findMany({
-    where: { familyId: actor.familyId, year, month },
+  // Budget burn rates — load via BudgetMonth → BudgetCategory
+  const monthStr = format(new Date(year, month - 1), "yyyy-MM");
+  const budgetMonth = await prisma.budgetMonth.findUnique({
+    where: { familyId_month: { familyId: actor.familyId, month: monthStr } },
+    include: { categories: true },
   });
+  const budgetCategories = budgetMonth?.categories ?? [];
 
   const today = now < thisMonthEnd ? now : thisMonthEnd;
   const daysElapsed = differenceInDays(today, thisMonthStart) + 1;
@@ -75,16 +85,16 @@ export const GET = withErrorHandler(async (req: Request) => {
   const monthProgress = daysElapsed / daysInMonth;
 
   const spendingMap = new Map(
-    thisMonthSpending.map((s) => [s.category ?? "Uncategorized", Number(s._sum.amount ?? 0)])
+    thisMonthSpending.map((s) => [s.categoryPrimary ?? "Uncategorized", Number(s._sum.amount ?? 0)])
   );
 
-  const burnRates = budgets.map((b) => {
-    const spent = spendingMap.get(b.category) ?? 0;
-    const spendProgress = Number(b.limitAmount) > 0 ? spent / Number(b.limitAmount) : 0;
+  const burnRates = budgetCategories.map((c) => {
+    const spent = spendingMap.get(c.categoryPrimary) ?? 0;
+    const spendProgress = Number(c.limitAmount) > 0 ? spent / Number(c.limitAmount) : 0;
     const burnRate = monthProgress > 0 ? spendProgress / monthProgress : 0;
     return {
-      category: b.category,
-      limitAmount: Number(b.limitAmount),
+      category: c.categoryPrimary,
+      limitAmount: Number(c.limitAmount),
       spent,
       monthProgress: Math.round(monthProgress * 100),
       spendProgress: Math.round(spendProgress * 100),

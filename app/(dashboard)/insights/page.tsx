@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 
 export default async function InsightsPage() {
   const { userId } = await auth();
@@ -14,15 +14,16 @@ export default async function InsightsPage() {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
+  const monthStr = format(now, "yyyy-MM");
 
   const thisMonthStart = startOfMonth(new Date(year, month - 1));
   const thisMonthEnd = endOfMonth(new Date(year, month - 1));
   const lastMonthStart = startOfMonth(subMonths(new Date(year, month - 1), 1));
   const lastMonthEnd = endOfMonth(subMonths(new Date(year, month - 1), 1));
 
-  const [thisMonth, lastMonth, budgets] = await Promise.all([
+  const [thisMonth, lastMonth, budgetMonth] = await Promise.all([
     prisma.transaction.groupBy({
-      by: ["category"],
+      by: ["categoryPrimary"],
       where: {
         familyId: member.familyId,
         date: { gte: thisMonthStart, lte: thisMonthEnd },
@@ -32,7 +33,7 @@ export default async function InsightsPage() {
       orderBy: { _sum: { amount: "desc" } },
     }),
     prisma.transaction.groupBy({
-      by: ["category"],
+      by: ["categoryPrimary"],
       where: {
         familyId: member.familyId,
         date: { gte: lastMonthStart, lte: lastMonthEnd },
@@ -40,17 +41,20 @@ export default async function InsightsPage() {
       },
       _sum: { amount: true },
     }),
-    prisma.budget.findMany({
-      where: { familyId: member.familyId, year, month },
+    prisma.budgetMonth.findUnique({
+      where: { familyId_month: { familyId: member.familyId, month: monthStr } },
+      include: { categories: true },
     }),
   ]);
 
+  const budgets = budgetMonth?.categories ?? [];
+
   const lastMonthMap = new Map(
-    lastMonth.map((s) => [s.category ?? "Uncategorized", Number(s._sum.amount ?? 0)])
+    lastMonth.map((s) => [s.categoryPrimary ?? "Uncategorized", Number(s._sum.amount ?? 0)])
   );
 
   const topCategories = thisMonth.slice(0, 8).map((s) => {
-    const cat = s.category ?? "Uncategorized";
+    const cat = s.categoryPrimary ?? "Uncategorized";
     const thisAmt = Number(s._sum.amount ?? 0);
     const lastAmt = lastMonthMap.get(cat) ?? 0;
     const delta = thisAmt - lastAmt;
@@ -66,16 +70,16 @@ export default async function InsightsPage() {
   const monthPct = daysElapsed / daysInMonth;
 
   const spendingMap = new Map(
-    thisMonth.map((s) => [s.category ?? "Uncategorized", Number(s._sum.amount ?? 0)])
+    thisMonth.map((s) => [s.categoryPrimary ?? "Uncategorized", Number(s._sum.amount ?? 0)])
   );
 
   const burnRates = budgets.map((b) => {
-    const spent = spendingMap.get(b.category) ?? 0;
+    const spent = spendingMap.get(b.categoryPrimary) ?? 0;
     const limit = Number(b.limitAmount);
     const spendPct = limit > 0 ? spent / limit : 0;
     const burnRate = monthPct > 0 ? spendPct / monthPct : 0;
     return {
-      category: b.category,
+      category: b.categoryPrimary,
       limit,
       spent,
       burnRate,

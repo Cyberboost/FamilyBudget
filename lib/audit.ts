@@ -11,6 +11,8 @@ interface AuditParams {
   familyId: string;
   actorId: string;
   action: AuditAction;
+  /** Type of the primary entity affected, e.g. "Transaction", "Goal", "Budget". */
+  entityType?: string;
   targetId?: string;
   metadata?: Record<string, unknown>;
 }
@@ -26,6 +28,7 @@ export async function audit(params: AuditParams): Promise<void> {
         familyId: params.familyId,
         actorId: params.actorId,
         action: params.action,
+        entityType: params.entityType ?? null,
         targetId: params.targetId ?? null,
         metadata: params.metadata as Prisma.InputJsonValue | undefined,
       },

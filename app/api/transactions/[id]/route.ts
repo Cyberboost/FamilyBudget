@@ -1,6 +1,7 @@
 /**
  * PATCH /api/transactions/[id]
  * Override category for a single transaction. PARENT or above only.
+ * Sets userCategoryOverride which takes precedence over the rule-applied category.
  */
 import { NextRequest } from "next/server";
 import { z } from "zod";
@@ -27,15 +28,19 @@ export const PATCH = withErrorHandler(async (req: Request, ctx: unknown) => {
   const body = bodySchema.parse(await (req as NextRequest).json());
   const updated = await prisma.transaction.update({
     where: { id },
-    data: { category: body.category },
+    data: { userCategoryOverride: body.category },
   });
 
   await audit({
     familyId: actor.familyId,
     actorId: actor.clerkId,
     action: AuditAction.CATEGORY_OVERRIDDEN,
+    entityType: "Transaction",
     targetId: id,
-    metadata: { oldCategory: tx.category, newCategory: body.category },
+    metadata: {
+      oldCategory: tx.userCategoryOverride ?? tx.categoryPrimary,
+      newCategory: body.category,
+    },
   });
 
   return Response.json(updated);

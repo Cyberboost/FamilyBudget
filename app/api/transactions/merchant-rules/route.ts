@@ -1,27 +1,30 @@
 /**
- * GET    /api/transactions/merchant-rules  – list rules
- * POST   /api/transactions/merchant-rules  – create rule
- * DELETE /api/transactions/merchant-rules  – delete rule
+ * GET    /api/transactions/merchant-rules  – list category rules
+ * POST   /api/transactions/merchant-rules  – create category rule
+ * DELETE /api/transactions/merchant-rules  – delete category rule
  */
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAnyFamilyMember, ApiError, withErrorHandler } from "@/lib/rbac";
-import { Role } from "@prisma/client";
+import { Role, MatchType } from "@prisma/client";
 import { audit, AuditAction } from "@/lib/audit";
 
 export const GET = withErrorHandler(async () => {
   const actor = await requireAnyFamilyMember();
-  const rules = await prisma.merchantRule.findMany({
-    where: { familyId: actor.familyId },
-    orderBy: { createdAt: "desc" },
+  const rules = await prisma.categoryRule.findMany({
+    where: { familyId: actor.familyId, isActive: true },
+    orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
   });
   return Response.json(rules);
 });
 
 const createSchema = z.object({
-  merchantName: z.string().min(1).max(200),
-  category: z.string().min(1).max(100),
+  matchType: z.nativeEnum(MatchType).default(MatchType.CONTAINS),
+  matchValue: z.string().min(1).max(200),
+  categoryPrimary: z.string().min(1).max(100),
+  categoryDetailed: z.string().max(100).optional(),
+  priority: z.number().int().min(0).max(1000).default(0),
 });
 
 export const POST = withErrorHandler(async (req: Request) => {
@@ -31,11 +34,15 @@ export const POST = withErrorHandler(async (req: Request) => {
   }
 
   const body = createSchema.parse(await (req as NextRequest).json());
-  const rule = await prisma.merchantRule.create({
+  const rule = await prisma.categoryRule.create({
     data: {
       familyId: actor.familyId,
-      merchantName: body.merchantName,
-      category: body.category,
+      matchType: body.matchType,
+      matchValue: body.matchValue,
+      categoryPrimary: body.categoryPrimary,
+      categoryDetailed: body.categoryDetailed ?? null,
+      priority: body.priority,
+      isActive: true,
       createdBy: actor.clerkId,
     },
   });
@@ -43,9 +50,14 @@ export const POST = withErrorHandler(async (req: Request) => {
   await audit({
     familyId: actor.familyId,
     actorId: actor.clerkId,
-    action: AuditAction.MERCHANT_RULE_CREATED,
+    action: AuditAction.CATEGORY_RULE_CREATED,
+    entityType: "CategoryRule",
     targetId: rule.id,
-    metadata: { merchantName: body.merchantName, category: body.category },
+    metadata: {
+      matchType: body.matchType,
+      matchValue: body.matchValue,
+      categoryPrimary: body.categoryPrimary,
+    },
   });
 
   return Response.json(rule, { status: 201 });
@@ -60,19 +72,20 @@ export const DELETE = withErrorHandler(async (req: Request) => {
   }
 
   const body = deleteSchema.parse(await (req as NextRequest).json());
-  const rule = await prisma.merchantRule.findUnique({ where: { id: body.ruleId } });
+  const rule = await prisma.categoryRule.findUnique({ where: { id: body.ruleId } });
   if (!rule || rule.familyId !== actor.familyId) {
     throw new ApiError(404, "Rule not found");
   }
 
-  await prisma.merchantRule.delete({ where: { id: body.ruleId } });
+  await prisma.categoryRule.delete({ where: { id: body.ruleId } });
 
   await audit({
     familyId: actor.familyId,
     actorId: actor.clerkId,
-    action: AuditAction.MERCHANT_RULE_DELETED,
+    action: AuditAction.CATEGORY_RULE_DELETED,
+    entityType: "CategoryRule",
     targetId: body.ruleId,
-    metadata: { merchantName: rule.merchantName },
+    metadata: { matchValue: rule.matchValue, categoryPrimary: rule.categoryPrimary },
   });
 
   return new Response(null, { status: 204 });

@@ -1,12 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { startOfMonth, endOfMonth } from "date-fns";
+import { startOfMonth, endOfMonth, format } from "date-fns";
 
 export default async function BudgetsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; month?: string }>;
+  searchParams: Promise<{ month?: string }>;
 }) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
@@ -15,21 +15,21 @@ export default async function BudgetsPage({
   if (!member) redirect("/dashboard");
   if (member.role === "KID") redirect("/kids");
 
-  const { year: yearParam, month: monthParam } = await searchParams;
+  const { month: monthParam } = await searchParams;
   const now = new Date();
-  const year = parseInt(yearParam ?? String(now.getFullYear()));
-  const month = parseInt(monthParam ?? String(now.getMonth() + 1));
+  const monthStr = monthParam ?? format(now, "yyyy-MM");
+  const [year, month] = monthStr.split("-").map(Number);
 
   const monthStart = startOfMonth(new Date(year, month - 1));
   const monthEnd = endOfMonth(new Date(year, month - 1));
 
-  const [budgets, spendingByCategory] = await Promise.all([
-    prisma.budget.findMany({
-      where: { familyId: member.familyId, year, month },
-      orderBy: { category: "asc" },
+  const [budgetMonth, spendingByCategory] = await Promise.all([
+    prisma.budgetMonth.findUnique({
+      where: { familyId_month: { familyId: member.familyId, month: monthStr } },
+      include: { categories: { orderBy: { categoryPrimary: "asc" } } },
     }),
     prisma.transaction.groupBy({
-      by: ["category"],
+      by: ["categoryPrimary"],
       where: {
         familyId: member.familyId,
         date: { gte: monthStart, lte: monthEnd },
@@ -39,15 +39,20 @@ export default async function BudgetsPage({
     }),
   ]);
 
+  const budgetCategories = budgetMonth?.categories ?? [];
+
   const spendingMap = new Map(
-    spendingByCategory.map((s) => [s.category ?? "Uncategorized", Number(s._sum.amount ?? 0)])
+    spendingByCategory.map((s) => [
+      s.categoryPrimary ?? "Uncategorized",
+      Number(s._sum.amount ?? 0),
+    ])
   );
 
-  const budgetRows = budgets.map((b) => {
-    const spent = spendingMap.get(b.category) ?? 0;
-    const limit = Number(b.limitAmount);
+  const budgetRows = budgetCategories.map((c) => {
+    const spent = spendingMap.get(c.categoryPrimary) ?? 0;
+    const limit = Number(c.limitAmount);
     return {
-      ...b,
+      ...c,
       spent,
       remaining: limit - spent,
       pct: limit > 0 ? Math.min(100, (spent / limit) * 100) : 0,
@@ -111,7 +116,7 @@ export default async function BudgetsPage({
           {budgetRows.map((b) => (
             <div key={b.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
               <div className="flex justify-between items-center mb-2">
-                <span className="font-medium text-gray-800">{b.category}</span>
+                <span className="font-medium text-gray-800">{b.categoryPrimary}</span>
                 <div className="text-sm text-right">
                   <span className={b.overspent ? "text-red-600 font-bold" : "text-gray-800"}>
                     ${b.spent.toFixed(2)}

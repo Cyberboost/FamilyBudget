@@ -34,9 +34,11 @@ export default async function DashboardPage() {
   const month = now.getMonth() + 1;
 
   // Summary data for dashboard
-  const [budgetSummary, recentTransactions, goals] = await Promise.all([
-    prisma.budget.findMany({
-      where: { familyId: member.familyId, year, month },
+  const monthStr = `${year}-${String(month).padStart(2, "0")}`;
+  const [budgetMonth, recentTransactions, goals] = await Promise.all([
+    prisma.budgetMonth.findUnique({
+      where: { familyId_month: { familyId: member.familyId, month: monthStr } },
+      include: { categories: true },
     }),
     prisma.transaction.findMany({
       where: { familyId: member.familyId },
@@ -51,7 +53,10 @@ export default async function DashboardPage() {
     }),
   ]);
 
-  const totalBudget = budgetSummary.reduce((a, b) => a + Number(b.limitAmount), 0);
+  const totalBudget = (budgetMonth?.categories ?? []).reduce(
+    (a, c) => a + Number(c.limitAmount),
+    0
+  );
 
   return (
     <div className="space-y-8">
@@ -114,7 +119,7 @@ export default async function DashboardPage() {
                   <td className="py-2 font-medium text-gray-800">{tx.name}</td>
                   <td className="py-2">
                     <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs">
-                      {tx.category ?? "Uncategorized"}
+                      {tx.userCategoryOverride ?? tx.categoryPrimary ?? "Uncategorized"}
                     </span>
                   </td>
                   <td className="py-2 text-right font-medium">${Number(tx.amount).toFixed(2)}</td>

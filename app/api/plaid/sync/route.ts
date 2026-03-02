@@ -9,7 +9,7 @@ import { plaidClient } from "@/lib/plaid";
 import { prisma } from "@/lib/prisma";
 import { decrypt } from "@/lib/encryption";
 import { requireAnyFamilyMember, ApiError, withErrorHandler } from "@/lib/rbac";
-import { Role } from "@prisma/client";
+import { Role, MatchType } from "@prisma/client";
 import { audit, AuditAction } from "@/lib/audit";
 import { rateLimit } from "@/lib/rateLimit";
 
@@ -55,16 +55,14 @@ export const POST = withErrorHandler(async (req: Request) => {
         const accountId = accountMap.get(tx.account_id);
         if (!accountId) continue;
 
-        const category =
+        const categoryPrimary =
           tx.personal_finance_category?.primary ??
           (tx.category ? tx.category[0] : null) ??
           "Uncategorized";
+        const categoryDetailed = tx.personal_finance_category?.detailed ?? null;
 
-        // Apply merchant rules
-        const overrideCategory = await applyMerchantRules(
-          actor.familyId,
-          tx.merchant_name ?? tx.name
-        );
+        // Apply category rules (returns { category, ruleId } or null)
+        const ruleMatch = await applyCategoryRules(actor.familyId, tx.merchant_name ?? tx.name);
 
         await prisma.transaction.upsert({
           where: { plaidTransactionId: tx.transaction_id },
@@ -77,16 +75,18 @@ export const POST = withErrorHandler(async (req: Request) => {
             date: new Date(tx.date),
             name: tx.name,
             merchantName: tx.merchant_name ?? null,
-            category: overrideCategory ?? category,
-            plaidCategory: category,
+            categoryPrimary: ruleMatch?.categoryPrimary ?? categoryPrimary,
+            categoryDetailed: ruleMatch?.categoryDetailed ?? categoryDetailed,
+            ruleAppliedId: ruleMatch?.ruleId ?? null,
             pending: tx.pending,
           },
           update: {
             amount: tx.amount,
             name: tx.name,
             merchantName: tx.merchant_name ?? null,
-            category: overrideCategory ?? category,
-            plaidCategory: category,
+            categoryPrimary: ruleMatch?.categoryPrimary ?? categoryPrimary,
+            categoryDetailed: ruleMatch?.categoryDetailed ?? categoryDetailed,
+            ruleAppliedId: ruleMatch?.ruleId ?? null,
             pending: tx.pending,
           },
         });
@@ -121,24 +121,58 @@ export const POST = withErrorHandler(async (req: Request) => {
     familyId: actor.familyId,
     actorId: actor.clerkId,
     action: AuditAction.TRANSACTION_SYNCED,
+    entityType: "Transaction",
     metadata: { totalAdded, totalModified, totalRemoved },
   });
 
   return Response.json({ totalAdded, totalModified, totalRemoved });
 });
 
+interface RuleMatch {
+  categoryPrimary: string;
+  categoryDetailed: string | null;
+  ruleId: string;
+}
+
 /**
- * Check merchant rules and return the matching category if any.
+ * Evaluate active CategoryRules (highest priority first) against the given
+ * merchant name / description. Returns the first match or null.
  */
-async function applyMerchantRules(familyId: string, merchantName: string): Promise<string | null> {
-  const rules = await prisma.merchantRule.findMany({
-    where: { familyId },
+async function applyCategoryRules(
+  familyId: string,
+  merchantName: string
+): Promise<RuleMatch | null> {
+  const rules = await prisma.categoryRule.findMany({
+    where: { familyId, isActive: true },
+    orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
   });
+
   const lower = merchantName.toLowerCase();
+
   for (const rule of rules) {
-    if (lower.includes(rule.merchantName.toLowerCase())) {
-      return rule.category;
+    const val = rule.matchValue.toLowerCase();
+    let matched = false;
+
+    if (rule.matchType === MatchType.CONTAINS) {
+      matched = lower.includes(val);
+    } else if (rule.matchType === MatchType.STARTS_WITH) {
+      matched = lower.startsWith(val);
+    } else if (rule.matchType === MatchType.REGEX) {
+      try {
+        matched = new RegExp(rule.matchValue, "i").test(merchantName);
+      } catch {
+        matched = false;
+      }
+    }
+
+    if (matched) {
+      return {
+        categoryPrimary: rule.categoryPrimary,
+        categoryDetailed: rule.categoryDetailed,
+        ruleId: rule.id,
+      };
     }
   }
+
   return null;
 }

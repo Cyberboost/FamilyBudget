@@ -49,6 +49,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     familyId: family.id,
     actorId: clerkId,
     action: AuditAction.FAMILY_CREATED,
+    entityType: "Family",
     targetId: family.id,
     metadata: { name: body.name },
   });

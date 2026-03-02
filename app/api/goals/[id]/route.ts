@@ -46,6 +46,7 @@ export const PATCH = withErrorHandler(async (req: Request, ctx: unknown) => {
     familyId: actor.familyId,
     actorId: actor.clerkId,
     action: AuditAction.GOAL_UPDATED,
+    entityType: "Goal",
     targetId: id,
     metadata: body,
   });
@@ -70,6 +71,7 @@ export const DELETE = withErrorHandler(async (_req: Request, ctx: unknown) => {
     familyId: actor.familyId,
     actorId: actor.clerkId,
     action: AuditAction.GOAL_DELETED,
+    entityType: "Goal",
     targetId: id,
     metadata: { name: goal.name },
   });

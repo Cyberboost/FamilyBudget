@@ -49,6 +49,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     familyId: actor.familyId,
     actorId: actor.clerkId,
     action: AuditAction.MEMBER_INVITED,
+    entityType: "Invite",
     targetId: invite.id,
     metadata: { email: body.email, role: body.role },
   });
@@ -94,6 +95,7 @@ export const DELETE = withErrorHandler(async (req: Request) => {
     familyId: actor.familyId,
     actorId: actor.clerkId,
     action: AuditAction.INVITE_REVOKED,
+    entityType: "Invite",
     targetId: body.inviteId,
     metadata: { email: invite.email },
   });

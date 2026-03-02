@@ -49,6 +49,7 @@ export const PATCH = withErrorHandler(async (req: Request) => {
     familyId: actor.familyId,
     actorId: actor.clerkId,
     action: AuditAction.ROLE_CHANGED,
+    entityType: "FamilyMember",
     targetId: body.memberId,
     metadata: { newRole: body.role, previousRole: target.role },
   });
@@ -80,6 +81,7 @@ export const DELETE = withErrorHandler(async (req: Request) => {
     familyId: actor.familyId,
     actorId: actor.clerkId,
     action: AuditAction.MEMBER_REMOVED,
+    entityType: "FamilyMember",
     targetId: body.memberId,
     metadata: { email: target.email, role: target.role },
   });

@@ -54,6 +54,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     familyId: actor.familyId,
     actorId: actor.clerkId,
     action: AuditAction.BANK_CONNECTED,
+    entityType: "PlaidItem",
     targetId: plaidItem.id,
     metadata: { institutionName: body.institution_name, itemId: item_id },
   });

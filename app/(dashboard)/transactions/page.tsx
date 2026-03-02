@@ -26,7 +26,9 @@ export default async function TransactionsPage({
       { merchantName: { contains: search, mode: "insensitive" } },
     ];
   }
-  if (category) where.category = category;
+  if (category) {
+    where.OR = [{ userCategoryOverride: category }, { categoryPrimary: category }];
+  }
 
   const [total, transactions, categories] = await Promise.all([
     prisma.transaction.count({ where }),
@@ -39,14 +41,16 @@ export default async function TransactionsPage({
     }),
     prisma.transaction.findMany({
       where: { familyId: member.familyId },
-      select: { category: true },
-      distinct: ["category"],
-      orderBy: { category: "asc" },
+      select: { categoryPrimary: true },
+      distinct: ["categoryPrimary"],
+      orderBy: { categoryPrimary: "asc" },
     }),
   ]);
 
   const pages = Math.ceil(total / pageSize);
-  const uniqueCategories = categories.map((c) => c.category ?? "Uncategorized").filter(Boolean);
+  const uniqueCategories = categories
+    .map((c) => c.categoryPrimary ?? "Uncategorized")
+    .filter(Boolean);
 
   return (
     <div className="space-y-6">
@@ -120,7 +124,7 @@ export default async function TransactionsPage({
                   </td>
                   <td className="px-4 py-3">
                     <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs">
-                      {tx.category ?? "Uncategorized"}
+                      {tx.userCategoryOverride ?? tx.categoryPrimary ?? "Uncategorized"}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right font-semibold">

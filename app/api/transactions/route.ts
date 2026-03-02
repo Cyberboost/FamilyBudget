@@ -38,7 +38,10 @@ export const GET = withErrorHandler(async (req: Request) => {
       { merchantName: { contains: search, mode: "insensitive" } },
     ];
   }
-  if (category) where.category = category;
+  if (category) {
+    // Match against userCategoryOverride first, then categoryPrimary
+    where.OR = [{ userCategoryOverride: category }, { categoryPrimary: category }];
+  }
   if (accountId) where.accountId = accountId;
   if (startDate || endDate) {
     where.date = {

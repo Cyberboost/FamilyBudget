@@ -52,7 +52,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     });
     await tx.invite.update({
       where: { id: invite.id },
-      data: { status: "ACCEPTED" },
+      data: { status: "ACCEPTED", acceptedAt: new Date() },
     });
     return m;
   });
@@ -61,6 +61,7 @@ export const POST = withErrorHandler(async (req: Request) => {
     familyId: invite.familyId,
     actorId: clerkId,
     action: AuditAction.INVITE_ACCEPTED,
+    entityType: "Invite",
     targetId: invite.id,
     metadata: { email: body.email, role: invite.role },
   });

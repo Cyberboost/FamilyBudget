@@ -6,6 +6,7 @@ import { Suspense } from "react";
 import { MonthPicker } from "@/components/transactions/MonthPicker";
 import { TransactionsTable } from "@/components/transactions/TransactionsTable";
 import type { DrawerTransaction } from "@/components/transactions/TransactionDrawer";
+import { formatCategory } from "@/lib/categories";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -56,15 +57,23 @@ export default async function TransactionsPage({
     familyId: member.familyId,
     date: { gte: startDate, lt: endDate },
   };
+
+  // Collect AND conditions so q + category can coexist without overwriting each other
+  const andConditions: Record<string, unknown>[] = [];
   if (q) {
-    where.OR = [
-      { name: { contains: q, mode: "insensitive" } },
-      { merchantName: { contains: q, mode: "insensitive" } },
-    ];
+    andConditions.push({
+      OR: [
+        { name: { contains: q, mode: "insensitive" } },
+        { merchantName: { contains: q, mode: "insensitive" } },
+      ],
+    });
   }
   if (category) {
-    where.OR = [{ userCategoryOverride: category }, { categoryPrimary: category }];
+    andConditions.push({
+      OR: [{ userCategoryOverride: category }, { categoryPrimary: category }],
+    });
   }
+  if (andConditions.length > 0) where.AND = andConditions;
   if (accountId) where.accountId = accountId;
 
   const [total, transactions, accounts, categoryRows] = await Promise.all([
@@ -151,7 +160,7 @@ export default async function TransactionsPage({
           <option value="">All categories</option>
           {uniqueCategories.map((cat) => (
             <option key={cat} value={cat}>
-              {cat.replace(/_/g, " ")}
+              {formatCategory(cat)}
             </option>
           ))}
         </select>

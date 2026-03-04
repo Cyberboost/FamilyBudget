@@ -45,6 +45,15 @@ export const PATCH = withErrorHandler(async (req: Request, ctx: unknown) => {
     },
   });
 
+  await audit({
+    familyId: actor.familyId,
+    actorId: actor.clerkId,
+    action: AuditAction.CATEGORY_RULE_UPDATED,
+    entityType: "CategoryRule",
+    targetId: id,
+    metadata: body,
+  });
+
   return Response.json(updated);
 });
 

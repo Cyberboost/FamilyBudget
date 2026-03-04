@@ -69,7 +69,7 @@ export function TransactionDrawer({ transaction: tx, onClose, onSave }: Transact
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to save");
-      onSave({ ...tx, userCategoryOverride: category || null, note: note || null });
+      onSave({ ...tx, userCategoryOverride: category || null, note });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {

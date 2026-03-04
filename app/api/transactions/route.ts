@@ -42,15 +42,23 @@ export const GET = withErrorHandler(async (req: Request) => {
   // Base where clause — always scoped to the family
   const where: Record<string, unknown> = { familyId: actor.familyId };
 
+  // Collect top-level AND conditions so that q + category can coexist
+  const andConditions: Record<string, unknown>[] = [];
+
   if (q) {
-    where.OR = [
-      { name: { contains: q, mode: "insensitive" } },
-      { merchantName: { contains: q, mode: "insensitive" } },
-    ];
+    andConditions.push({
+      OR: [
+        { name: { contains: q, mode: "insensitive" } },
+        { merchantName: { contains: q, mode: "insensitive" } },
+      ],
+    });
   }
   if (category) {
-    where.OR = [{ userCategoryOverride: category }, { categoryPrimary: category }];
+    andConditions.push({
+      OR: [{ userCategoryOverride: category }, { categoryPrimary: category }],
+    });
   }
+  if (andConditions.length > 0) where.AND = andConditions;
   if (accountId) where.accountId = accountId;
 
   // Date range — month param takes precedence over startDate/endDate

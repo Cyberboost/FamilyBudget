@@ -103,6 +103,10 @@ enum AuditAction {
   BANK_CONNECTED
   BANK_DISCONNECTED
   TRANSACTION_SYNCED
+  /// Emitted when a Plaid item is successfully connected (access token exchanged).
+  PLAID_ITEM_CONNECTED
+  /// Emitted after each transactions/sync run.
+  PLAID_SYNC_RUN
   CATEGORY_OVERRIDDEN
   CATEGORY_RULE_CREATED
   CATEGORY_RULE_DELETED

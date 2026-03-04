@@ -8,8 +8,9 @@ import { NextRequest } from "next/server";
 import { plaidClient } from "@/lib/plaid";
 import { prisma } from "@/lib/prisma";
 import { getPlaidAccessToken } from "@/lib/plaid-repository";
+import { applyCategoryRules } from "@/lib/plaid-utils";
 import { requireAnyFamilyMember, ApiError, withErrorHandler } from "@/lib/rbac";
-import { Role, MatchType } from "@prisma/client";
+import { Role } from "@prisma/client";
 import { audit, AuditAction } from "@/lib/audit";
 import { rateLimit } from "@/lib/rateLimit";
 
@@ -50,8 +51,22 @@ export const POST = withErrorHandler(async (req: Request) => {
         item.accounts.map((a) => [a.plaidAccountId, a.id])
       );
 
+      const changedTxs = [...added, ...modified];
+
+      // Batch-fetch existing transactions that have a user category override so
+      // we can skip overwriting them.  One query per page instead of N queries.
+      const changedIds = changedTxs.map((tx) => tx.transaction_id);
+      const existingWithOverride = await prisma.transaction.findMany({
+        where: {
+          plaidTransactionId: { in: changedIds },
+          userCategoryOverride: { not: null },
+        },
+        select: { plaidTransactionId: true },
+      });
+      const overrideSet = new Set(existingWithOverride.map((r) => r.plaidTransactionId));
+
       // Upsert added/modified transactions
-      for (const tx of [...added, ...modified]) {
+      for (const tx of changedTxs) {
         const accountId = accountMap.get(tx.account_id);
         if (!accountId) continue;
 
@@ -61,8 +76,21 @@ export const POST = withErrorHandler(async (req: Request) => {
           "Uncategorized";
         const categoryDetailed = tx.personal_finance_category?.detailed ?? null;
 
-        // Apply category rules (returns { category, ruleId } or null)
+        // Apply category rules deterministically (confidence=1.0 when matched)
         const ruleMatch = await applyCategoryRules(actor.familyId, tx.merchant_name ?? tx.name);
+
+        // Category fields to apply on create (always) and on update (only when
+        // no user override is set).
+        const categoryFields = {
+          categoryPrimary: ruleMatch?.categoryPrimary ?? categoryPrimary,
+          categoryDetailed: ruleMatch?.categoryDetailed ?? categoryDetailed,
+          ruleAppliedId: ruleMatch?.ruleId ?? null,
+          confidence: ruleMatch ? 1.0 : null,
+        };
+
+        // Check if the existing transaction already has a user-supplied category
+        // override.  If so, skip updating category/rule fields to preserve it.
+        const hasOverride = overrideSet.has(tx.transaction_id);
 
         await prisma.transaction.upsert({
           where: { plaidTransactionId: tx.transaction_id },
@@ -75,19 +103,16 @@ export const POST = withErrorHandler(async (req: Request) => {
             date: new Date(tx.date),
             name: tx.name,
             merchantName: tx.merchant_name ?? null,
-            categoryPrimary: ruleMatch?.categoryPrimary ?? categoryPrimary,
-            categoryDetailed: ruleMatch?.categoryDetailed ?? categoryDetailed,
-            ruleAppliedId: ruleMatch?.ruleId ?? null,
             pending: tx.pending,
+            ...categoryFields,
           },
           update: {
             amount: tx.amount,
             name: tx.name,
             merchantName: tx.merchant_name ?? null,
-            categoryPrimary: ruleMatch?.categoryPrimary ?? categoryPrimary,
-            categoryDetailed: ruleMatch?.categoryDetailed ?? categoryDetailed,
-            ruleAppliedId: ruleMatch?.ruleId ?? null,
             pending: tx.pending,
+            // Only apply new category data when the user hasn't made an explicit override
+            ...(hasOverride ? {} : categoryFields),
           },
         });
       }
@@ -120,59 +145,10 @@ export const POST = withErrorHandler(async (req: Request) => {
   await audit({
     familyId: actor.familyId,
     actorId: actor.clerkId,
-    action: AuditAction.TRANSACTION_SYNCED,
+    action: AuditAction.PLAID_SYNC_RUN,
     entityType: "Transaction",
     metadata: { totalAdded, totalModified, totalRemoved },
   });
 
   return Response.json({ totalAdded, totalModified, totalRemoved });
 });
-
-interface RuleMatch {
-  categoryPrimary: string;
-  categoryDetailed: string | null;
-  ruleId: string;
-}
-
-/**
- * Evaluate active CategoryRules (highest priority first) against the given
- * merchant name / description. Returns the first match or null.
- */
-async function applyCategoryRules(
-  familyId: string,
-  merchantName: string
-): Promise<RuleMatch | null> {
-  const rules = await prisma.categoryRule.findMany({
-    where: { familyId, isActive: true },
-    orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
-  });
-
-  const lower = merchantName.toLowerCase();
-
-  for (const rule of rules) {
-    const val = rule.matchValue.toLowerCase();
-    let matched = false;
-
-    if (rule.matchType === MatchType.CONTAINS) {
-      matched = lower.includes(val);
-    } else if (rule.matchType === MatchType.STARTS_WITH) {
-      matched = lower.startsWith(val);
-    } else if (rule.matchType === MatchType.REGEX) {
-      try {
-        matched = new RegExp(rule.matchValue, "i").test(merchantName);
-      } catch {
-        matched = false;
-      }
-    }
-
-    if (matched) {
-      return {
-        categoryPrimary: rule.categoryPrimary,
-        categoryDetailed: rule.categoryDetailed,
-        ruleId: rule.id,
-      };
-    }
-  }
-
-  return null;
-}

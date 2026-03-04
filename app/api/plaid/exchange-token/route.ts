@@ -48,7 +48,7 @@ export const POST = withErrorHandler(async (req: Request) => {
   await audit({
     familyId: actor.familyId,
     actorId: actor.clerkId,
-    action: AuditAction.BANK_CONNECTED,
+    action: AuditAction.PLAID_ITEM_CONNECTED,
     entityType: "PlaidItem",
     targetId: plaidItem.id,
     metadata: { institutionName: body.institution_name, itemId: item_id },

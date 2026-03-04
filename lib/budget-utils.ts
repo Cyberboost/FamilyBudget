@@ -90,7 +90,7 @@ export function computeBudgetLines(
       const spent = spendingMap.get(c.categoryPrimary) ?? 0;
       const limit = c.limitAmount;
       const remaining = limit - spent;
-      const pct = limit > 0 ? (spent / limit) * 100 : 0;
+      const pct = limit > 0 ? (spent / limit) * 100 : spent > 0 ? 100 : 0;
       return {
         category: c.categoryPrimary,
         spent,

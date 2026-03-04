@@ -227,9 +227,9 @@ export default async function DashboardPage() {
                 <span className="text-red-700 font-medium">{formatCategory(cat.category)}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-red-600">${cat.spent.toFixed(2)}</span>
-                  <span className="text-red-400">/ ${cat.limit!.toFixed(2)}</span>
+                  <span className="text-red-400">/ ${(cat.limit ?? 0).toFixed(2)}</span>
                   <span className="font-semibold text-red-700">
-                    +${Math.abs(cat.remaining!).toFixed(2)} over
+                    +${Math.abs((cat.remaining ?? 0)).toFixed(2)} over
                   </span>
                 </div>
               </div>

@@ -4,6 +4,12 @@ import { useState } from "react";
 import { PLAID_CATEGORIES, formatCategory } from "@/lib/categories";
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const MIN_BUDGET_LIMIT = 0.01;
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -22,6 +28,27 @@ interface BudgetEditorProps {
   initialLines: BudgetCategoryLine[];
   /** Only parents may edit. */
   canEdit: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Pure helper — recompute derived fields when limit changes
+// ---------------------------------------------------------------------------
+
+function recomputeLine(
+  line: BudgetCategoryLine,
+  newId: string,
+  newLimit: number
+): BudgetCategoryLine {
+  const remaining = newLimit - line.spent;
+  const pct = newLimit > 0 ? (line.spent / newLimit) * 100 : line.spent > 0 ? 100 : 0;
+  return {
+    ...line,
+    id: newId,
+    limitAmount: newLimit,
+    remaining,
+    pct,
+    overspent: line.spent > newLimit,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -51,8 +78,8 @@ export function BudgetEditor({ month, initialLines, canEdit }: BudgetEditorProps
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     const amount = parseFloat(limit);
-    if (isNaN(amount) || amount <= 0) {
-      setFormError("Limit must be a positive number");
+    if (isNaN(amount) || amount < MIN_BUDGET_LIMIT) {
+      setFormError(`Limit must be at least $${MIN_BUDGET_LIMIT}`);
       return;
     }
     setSubmitting(true);
@@ -71,9 +98,7 @@ export function BudgetEditor({ month, initialLines, canEdit }: BudgetEditorProps
         const exists = prev.find((l) => l.categoryPrimary === category);
         if (exists) {
           return prev.map((l) =>
-            l.categoryPrimary === category
-              ? { ...l, id: data.id, limitAmount: amount, remaining: amount - l.spent, pct: l.spent > 0 ? (l.spent / amount) * 100 : 0, overspent: l.spent > amount }
-              : l
+            l.categoryPrimary === category ? recomputeLine(l, data.id, amount) : l
           );
         }
         return [
@@ -104,8 +129,8 @@ export function BudgetEditor({ month, initialLines, canEdit }: BudgetEditorProps
 
   async function saveEdit(line: BudgetCategoryLine) {
     const amount = parseFloat(editLimit);
-    if (isNaN(amount) || amount <= 0) {
-      setEditError("Limit must be a positive number");
+    if (isNaN(amount) || amount < MIN_BUDGET_LIMIT) {
+      setEditError(`Limit must be at least $${MIN_BUDGET_LIMIT}`);
       return;
     }
     setEditSaving(true);
@@ -124,16 +149,7 @@ export function BudgetEditor({ month, initialLines, canEdit }: BudgetEditorProps
       if (!res.ok) throw new Error(data.error ?? "Failed to save");
       setLines((prev) =>
         prev.map((l) =>
-          l.categoryPrimary === line.categoryPrimary
-            ? {
-                ...l,
-                id: data.id,
-                limitAmount: amount,
-                remaining: amount - l.spent,
-                pct: l.spent > 0 ? (l.spent / amount) * 100 : 0,
-                overspent: l.spent > amount,
-              }
-            : l
+          l.categoryPrimary === line.categoryPrimary ? recomputeLine(l, data.id, amount) : l
         )
       );
       setEditingId(null);
@@ -221,8 +237,8 @@ export function BudgetEditor({ month, initialLines, canEdit }: BudgetEditorProps
                     <span className="text-sm text-gray-500">$</span>
                     <input
                       type="number"
-                      min={0.01}
-                      step={0.01}
+                      min={MIN_BUDGET_LIMIT}
+                      step={MIN_BUDGET_LIMIT}
                       value={editLimit}
                       onChange={(e) => setEditLimit(e.target.value)}
                       className="w-32 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
@@ -325,8 +341,8 @@ export function BudgetEditor({ month, initialLines, canEdit }: BudgetEditorProps
                   <label className="block text-xs text-gray-500 mb-1">Monthly Limit ($)</label>
                   <input
                     type="number"
-                    min={0.01}
-                    step={0.01}
+                    min={MIN_BUDGET_LIMIT}
+                    step={MIN_BUDGET_LIMIT}
                     value={limit}
                     onChange={(e) => setLimit(e.target.value)}
                     placeholder="0.00"

@@ -101,10 +101,16 @@ describe("computeBudgetLines", () => {
     expect(line.pct).toBeCloseTo(25, 1);
   });
 
-  it("sets pct to 0 when limitAmount is 0", () => {
+  it("sets pct to 100 when limitAmount is 0 and spent > 0 (fully overspent)", () => {
     const cats: BudgetCatRow[] = [{ categoryPrimary: "FOOD_AND_DRINK", limitAmount: 0 }];
     const spendingMap = buildSpendingMap([{ categoryPrimary: "FOOD_AND_DRINK", amount: 10 }]);
     const [line] = computeBudgetLines(cats, spendingMap);
+    expect(line.pct).toBe(100);
+  });
+
+  it("sets pct to 0 when limitAmount is 0 and spent is 0", () => {
+    const cats: BudgetCatRow[] = [{ categoryPrimary: "FOOD_AND_DRINK", limitAmount: 0 }];
+    const [line] = computeBudgetLines(cats, new Map());
     expect(line.pct).toBe(0);
   });
 

@@ -18,7 +18,6 @@
  *                           the caller/UI may choose to filter).
  *   KID                   – 403 (budgets are a parent concern).
  */
-import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAnyFamilyMember, ApiError, withErrorHandler } from "@/lib/rbac";
 import { Role } from "@prisma/client";
@@ -35,7 +34,7 @@ export const GET = withErrorHandler(async (req: Request) => {
     throw new ApiError(403, "Kids do not have access to budget summaries");
   }
 
-  const url = new URL((req as NextRequest).url);
+  const url = new URL(req.url);
   const now = new Date();
 
   // Default to current month; accept YYYY-MM override

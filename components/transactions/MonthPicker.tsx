@@ -4,13 +4,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 interface MonthPickerProps {
   currentMonth: string; // YYYY-MM
+  /** Base path for navigation (default: "/transactions"). */
+  basePath?: string;
 }
 
 /**
  * Client component — renders prev/current/next month navigation.
  * Updates the URL `month` query param on change, preserving other params.
  */
-export function MonthPicker({ currentMonth }: MonthPickerProps) {
+export function MonthPicker({ currentMonth, basePath = "/transactions" }: MonthPickerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -21,7 +23,7 @@ export function MonthPicker({ currentMonth }: MonthPickerProps) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("month", newMonth);
     params.delete("page"); // reset pagination when month changes
-    router.push(`/transactions?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`);
   }
 
   const [y, m] = currentMonth.split("-").map(Number);

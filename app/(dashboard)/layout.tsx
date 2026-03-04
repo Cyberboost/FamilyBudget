@@ -7,6 +7,7 @@ import { UserButton } from "@clerk/nextjs";
 const nav = [
   { href: "/dashboard", label: "Dashboard", icon: "📊" },
   { href: "/transactions", label: "Transactions", icon: "💳" },
+  { href: "/rules", label: "Rules", icon: "⚡" },
   { href: "/budgets", label: "Budgets", icon: "📋" },
   { href: "/goals", label: "Goals", icon: "🎯" },
   { href: "/insights", label: "Insights", icon: "📈" },

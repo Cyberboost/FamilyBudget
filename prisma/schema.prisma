@@ -93,6 +93,16 @@ enum RequestStatus {
   DENIED
 }
 
+/// Controls how much transaction data is shared with teen/kid family members.
+/// NONE    – teens/kids cannot see any transactions.
+/// SUMMARY – teens/kids see only per-category totals (no individual transactions).
+/// DETAIL  – teens/kids see the full transaction list.
+enum SharedScope {
+  NONE
+  SUMMARY
+  DETAIL
+}
+
 enum AuditAction {
   FAMILY_CREATED
   MEMBER_INVITED
@@ -149,10 +159,12 @@ model User {
 // ------------------------------------------------------------------
 
 model Family {
-  id          String   @id @default(cuid())
+  id          String      @id @default(cuid())
   name        String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  /// Controls how much of the family's transaction data is visible to teens/kids.
+  sharedScope SharedScope @default(NONE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 
   members       FamilyMember[]
   invites       Invite[]
@@ -278,6 +290,8 @@ model Transaction {
   ruleAppliedId        String?
   /// Classifier confidence score (0.0–1.0); null for rule-based overrides
   confidence           Float?
+  /// User-supplied note / memo for this transaction.
+  note                 String?
   pending              Boolean  @default(false)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

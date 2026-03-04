@@ -8,7 +8,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { plaidClient } from "@/lib/plaid";
 import { prisma } from "@/lib/prisma";
-import { encrypt } from "@/lib/encryption";
+import { savePlaidItemAccessToken } from "@/lib/plaid-repository";
 import { requireAnyFamilyMember, ApiError, withErrorHandler } from "@/lib/rbac";
 import { Role } from "@prisma/client";
 import { audit, AuditAction } from "@/lib/audit";
@@ -37,18 +37,13 @@ export const POST = withErrorHandler(async (req: Request) => {
   });
   const { access_token, item_id } = exchangeResponse.data;
 
-  // Encrypt the access token before storing
-  const encryptedAccessToken = encrypt(access_token);
-
-  const plaidItem = await prisma.plaidItem.create({
-    data: {
-      familyId: actor.familyId,
-      plaidItemId: item_id,
-      encryptedAccessToken,
-      institutionId: body.institution_id,
-      institutionName: body.institution_name,
-    },
-  });
+  // Encrypt and persist via the repository (token never touches the DB in plaintext)
+  const plaidItem = await savePlaidItemAccessToken(
+    actor.familyId,
+    item_id,
+    body.institution_name ?? null,
+    access_token
+  );
 
   await audit({
     familyId: actor.familyId,

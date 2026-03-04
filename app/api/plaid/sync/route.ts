@@ -7,7 +7,7 @@
 import { NextRequest } from "next/server";
 import { plaidClient } from "@/lib/plaid";
 import { prisma } from "@/lib/prisma";
-import { decrypt } from "@/lib/encryption";
+import { getPlaidAccessToken } from "@/lib/plaid-repository";
 import { requireAnyFamilyMember, ApiError, withErrorHandler } from "@/lib/rbac";
 import { Role, MatchType } from "@prisma/client";
 import { audit, AuditAction } from "@/lib/audit";
@@ -32,7 +32,7 @@ export const POST = withErrorHandler(async (req: Request) => {
   let totalRemoved = 0;
 
   for (const item of items) {
-    const accessToken = decrypt(item.encryptedAccessToken);
+    const accessToken = await getPlaidAccessToken(item.id);
     let cursor = item.cursor ?? undefined;
     let hasMore = true;
 

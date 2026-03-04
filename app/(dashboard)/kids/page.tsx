@@ -77,10 +77,12 @@ export default async function KidsPage() {
       }
     : null;
 
-  const spendRows: CategorySpend[] = (spendAgg as { categoryPrimary: string | null; _sum: { amount: unknown } }[]).map((s) => ({
-    category: s.categoryPrimary ?? "Uncategorized",
-    amount: Number(s._sum.amount ?? 0),
-  }));
+  const spendRows: CategorySpend[] = Array.isArray(spendAgg)
+    ? spendAgg.map((s) => ({
+        category: s.categoryPrimary ?? "Uncategorized",
+        amount: Number(s._sum.amount ?? 0),
+      }))
+    : [];
 
   const overview = computeKidOverview(goalRows, spendRows, allowance, now);
 

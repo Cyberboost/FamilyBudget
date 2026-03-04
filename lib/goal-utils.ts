@@ -79,14 +79,16 @@ export function computeGoalProgress(goal: GoalRow, now: Date = new Date()): Goal
 
   let daysLeft: number | null = null;
   if (goal.targetDate) {
-    // Truncate both dates to midnight to avoid partial-day drift
+    // Truncate both dates to midnight to avoid partial-day drift.
+    // Use Math.round to handle DST edge cases correctly for both positive
+    // (future) and negative (overdue) values.
     const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const targetDay = new Date(
       goal.targetDate.getFullYear(),
       goal.targetDate.getMonth(),
       goal.targetDate.getDate()
     ).getTime();
-    daysLeft = Math.ceil((targetDay - nowDay) / (1000 * 60 * 60 * 24));
+    daysLeft = Math.round((targetDay - nowDay) / (1000 * 60 * 60 * 24));
   }
 
   return {

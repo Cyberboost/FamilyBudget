@@ -85,8 +85,8 @@ export function GoalEditor({ initialGoals, canEdit }: GoalEditorProps) {
   // Create
   // ---------------------------------------------------------------------------
 
-  function setField<K extends keyof typeof EMPTY_FORM>(k: K, v: (typeof EMPTY_FORM)[K]) {
-    setForm((f) => ({ ...f, [k]: v }));
+  function setField(updates: Partial<typeof EMPTY_FORM>) {
+    setForm((f) => ({ ...f, ...updates }));
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -279,7 +279,7 @@ export function GoalEditor({ initialGoals, canEdit }: GoalEditorProps) {
                   <input
                     type="text"
                     value={form.name}
-                    onChange={(e) => setField("name", e.target.value)}
+                    onChange={(e) => setField({ name: e.target.value })}
                     maxLength={200}
                     placeholder="e.g. Family Vacation"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
@@ -293,7 +293,7 @@ export function GoalEditor({ initialGoals, canEdit }: GoalEditorProps) {
                   <input
                     type="text"
                     value={form.description}
-                    onChange={(e) => setField("description", e.target.value)}
+                    onChange={(e) => setField({ description: e.target.value })}
                     maxLength={500}
                     placeholder="Short description"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
@@ -305,7 +305,7 @@ export function GoalEditor({ initialGoals, canEdit }: GoalEditorProps) {
                   <label className="block text-xs text-gray-500 mb-1">Type</label>
                   <select
                     value={form.type}
-                    onChange={(e) => setField("type", e.target.value as GoalType)}
+                    onChange={(e) => setField({ type: e.target.value as GoalType })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   >
                     {GOAL_TYPES.map((t) => (
@@ -321,7 +321,7 @@ export function GoalEditor({ initialGoals, canEdit }: GoalEditorProps) {
                   <label className="block text-xs text-gray-500 mb-1">Visibility</label>
                   <select
                     value={form.visibility}
-                    onChange={(e) => setField("visibility", e.target.value as GoalVisibility)}
+                    onChange={(e) => setField({ visibility: e.target.value as GoalVisibility })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   >
                     {VISIBILITY_OPTIONS.map((v) => (
@@ -340,7 +340,7 @@ export function GoalEditor({ initialGoals, canEdit }: GoalEditorProps) {
                     min={0.01}
                     step={0.01}
                     value={form.targetAmount}
-                    onChange={(e) => setField("targetAmount", e.target.value)}
+                    onChange={(e) => setField({ targetAmount: e.target.value })}
                     placeholder="0.00"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                     required
@@ -355,7 +355,7 @@ export function GoalEditor({ initialGoals, canEdit }: GoalEditorProps) {
                     min={0}
                     step={0.01}
                     value={form.savedAmount}
-                    onChange={(e) => setField("savedAmount", e.target.value)}
+                    onChange={(e) => setField({ savedAmount: e.target.value })}
                     placeholder="0.00"
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   />
@@ -367,7 +367,7 @@ export function GoalEditor({ initialGoals, canEdit }: GoalEditorProps) {
                   <input
                     type="date"
                     value={form.targetDate}
-                    onChange={(e) => setField("targetDate", e.target.value)}
+                    onChange={(e) => setField({ targetDate: e.target.value })}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   />
                 </div>

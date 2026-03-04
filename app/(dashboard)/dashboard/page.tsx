@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { startOfMonth, endOfMonth, format } from "date-fns";
-import { buildSpendingMap, computeDashboardSummary } from "@/lib/budget-utils";
+import { computeDashboardSummary } from "@/lib/budget-utils";
 import { formatCategory } from "@/lib/categories";
 
 export default async function DashboardPage() {
@@ -76,7 +76,6 @@ export default async function DashboardPage() {
   }));
 
   const summary = computeDashboardSummary(spendingRows, budgetCats, 5);
-  const spendingMap = buildSpendingMap(spendingRows);
 
   const monthLabel = now.toLocaleString("default", { month: "long", year: "numeric" });
 

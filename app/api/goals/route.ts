@@ -14,11 +14,14 @@ export const GET = withErrorHandler(async () => {
 
   let goals;
   if (actor.role === Role.KID || actor.role === Role.TEEN) {
-    // Kids/teens see only goals explicitly shared with them
+    // Kids/teens see goals explicitly shared with them OR visibility=FAMILY
     goals = await prisma.goal.findMany({
       where: {
         familyId: actor.familyId,
-        shares: { some: { clerkId: actor.clerkId } },
+        OR: [
+          { shares: { some: { clerkId: actor.clerkId } } },
+          { visibility: GoalVisibility.FAMILY },
+        ],
       },
       include: {
         shares: { select: { clerkId: true } },

@@ -4,9 +4,9 @@
  */
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { clerkClient } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, ApiError, withErrorHandler } from "@/lib/rbac";
+import { requireAuth, getOrCreateUser } from "@/lib/auth";
+import { ApiError, withErrorHandler } from "@/lib/rbac";
 import { audit, AuditAction } from "@/lib/audit";
 
 const bodySchema = z.object({
@@ -24,12 +24,8 @@ export const POST = withErrorHandler(async (req: Request) => {
 
   const body = bodySchema.parse(await (req as NextRequest).json());
 
-  // Fetch email from Clerk
-  const clerk = await clerkClient();
-  const clerkUser = await clerk.users.getUser(clerkId);
-  const email =
-    clerkUser.emailAddresses.find((e) => e.id === clerkUser.primaryEmailAddressId)?.emailAddress ??
-    "";
+  // Ensure the local User record exists (creates it from Clerk data if needed)
+  const user = await getOrCreateUser(clerkId);
 
   const family = await prisma.$transaction(async (tx) => {
     const f = await tx.family.create({ data: { name: body.name } });
@@ -37,8 +33,8 @@ export const POST = withErrorHandler(async (req: Request) => {
       data: {
         familyId: f.id,
         clerkId,
-        email,
-        name: `${clerkUser.firstName ?? ""} ${clerkUser.lastName ?? ""}`.trim() || null,
+        email: user.email,
+        name: [user.firstName, user.lastName].filter(Boolean).join(" ") || null,
         role: "PARENT_ADMIN",
       },
     });
